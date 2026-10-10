@@ -65,17 +65,16 @@
 
 ### 💾 数据存储与迁移
 
-本插件的所有用户配置（置顶、收藏、最后位置）均保存在 ComfyUI 的用户数据目录中，**不会因为清除浏览器缓存而丢失**。
+两个菜单的置顶、共享收藏和逐级分类记忆统一保存在 ComfyUI 的用户数据目录中，**不会因为清除浏览器缓存而丢失**。功能开关、快捷键和外观设置仍由 ComfyUI 设置系统保存。
 
 - **数据路径**：
 `ComfyUI/user/AlignLayout/`
 - **文件说明**：
-    - `pins.json`: 记录置顶信息。
-    - `quick.json`: 记录收藏信息。
-    - `last_category.json`: 记录最后一次打开的分类位置。
+    - `menu_data.json`：`favorites` 保存共享收藏；`add_node_menu` 和 `quick_node_menu` 分别保存各自的 `pins`（置顶及顺序）和 `last_category`（逐级分类记忆）。
+    - 首次使用新版时自动合并原有 5 个数据文件，核对写入成功后删除旧文件。
 
 **如何迁移？**
-如果你更换电脑或重装 ComfyUI，只需备份并复制 `ComfyUI/user/AlignLayout/` 文件夹到新环境即可保留所有习惯设置。
+如果你更换电脑或重装 ComfyUI，备份并复制 `ComfyUI/user/AlignLayout/menu_data.json` 到新环境的相同目录，即可保留两个菜单的置顶、收藏和分类记忆。
 
 ## 常见问题 (Q&A)
 

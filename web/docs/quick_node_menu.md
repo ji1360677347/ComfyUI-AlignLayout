@@ -53,13 +53,12 @@ Quick Menu 的置顶是**完全独立**的。你可以在这里通过置顶来�
 
 ### 💾 数据存储
 
-Quick Menu 与 Add Node Menu 共享收藏数据，但拥有独立的配置文件：
+Quick Menu 与 Add Node Menu 共用一个数据文件，收藏列表共享，置顶和分类记忆分别保存：
 
 - **数据路径**：`ComfyUI/user/AlignLayout/`
 - **文件说明**：
-    - `add_node_menu_quick.json` (🔴 **核心共享文件**)：存储所有被“收藏”的节点和分组数据。Quick Menu 读取此文件显示内容。
-    - `quick_menu_pins.json` (🔵 **独立文件**)：仅记录 Quick Menu 内部的置顶排序。
-    - `quick_menu_last_category.json` (🔵 **独立文件**)：记录 Quick Menu 上次打开的位置。
+    - `menu_data.json`：`favorites` 是共享收藏列表；`quick_node_menu.pins` 保存收藏菜单置顶及顺序，`quick_node_menu.last_category` 保存其逐级分类记忆。
+    - 首次使用新版时自动迁移并清理旧版数据文件；迁移和备份只需保留这一个文件。功能开关、快捷键和外观设置仍由 ComfyUI 设置系统保存。
 
 ### 常见问题 (Q&A)
 
@@ -70,4 +69,4 @@ A: 请先按 `A` 打开主菜单，右键点击你常用的节点选择“收藏
 A: **不会**。两者的置顶系统是分开的。这允许你在主菜单保留一套通用的置顶逻辑，而在 Quick Menu 建立一套针对特定任务的置顶逻辑。
 
 **Q: 如果我删除了 Add Node Menu 插件，这个还能用吗？**
-A: Quick Menu 依赖 `add_node_menu_quick.json` 数据文件。虽然理论上代码分离了，但设计逻辑上它们是伴生关系，建议同时保留。
+A: 收藏菜单使用 `menu_data.json` 中的共享收藏列表，并通过添加节点菜单管理收藏，建议同时保留两个功能。

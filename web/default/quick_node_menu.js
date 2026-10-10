@@ -152,8 +152,8 @@ export const createQuickNodeMenu = (scope) => ({
 
         // --- 缓存数据 ---
         let cachedData = {
-            quick_list: [],     // 对应 add_node_menu_quick.json 的内容
-            pins: {},           // Quick Menu 自己的 pins (quick_menu_pins.json)
+            quick_list: [],     // 共享收藏列表
+            pins: {},           // 收藏菜单独立的置顶记录
             last_category: {} // Quick Menu 自己的 last_category
         };
 
