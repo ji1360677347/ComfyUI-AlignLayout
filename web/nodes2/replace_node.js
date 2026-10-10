@@ -137,27 +137,19 @@ export const createReplaceNode = (scope) => ({
                 const screenY = self.lastMousePos.y;
 
                 const graphCanvas = app.canvas;
-                const ds = graphCanvas.ds;
-                const canvasRect = graphCanvas.canvas.getBoundingClientRect();
-
-                const canvasX = (screenX - canvasRect.left) / ds.scale - ds.offset[0];
-                const canvasY = (screenY - canvasRect.top) / ds.scale - ds.offset[1];
-
-                const dummyEvent = {
-                    type: "contextmenu",
-                    clientX: screenX,
-                    clientY: screenY,
-                    canvasX: canvasX,
-                    canvasY: canvasY,
-                    preventDefault: () => {},
-                    stopPropagation: () => {}
-                };
+                const searchEvent = new MouseEvent("dblclick", {
+                    clientX: screenX, clientY: screenY, button: 0
+                });
+                graphCanvas.adjustMouseEvent(searchEvent);
 
                 // [修复] 使用 setTimeout 延迟弹出，防止按键事件冲突导致搜索框失去焦点而自动关闭
                 // [V2] 增加延迟到 100ms，确保 Shift+R 的 keyup 事件完全处理完毕
                 scope.timeout(() => {
                     if (self.pendingReplaceNodeIds.length && self.activeGraph === app.canvas.graph) {
-                        app.canvas.showSearchBox(dummyEvent);
+                        // 与双击画布相同的入口，由 ComfyUI 按搜索框设置打开界面。
+                        graphCanvas.emitEvent({
+                            subType: "empty-double-click", originalEvent: searchEvent
+                        });
                     }
                 }, 100);
             }
@@ -205,16 +197,21 @@ export const createReplaceNode = (scope) => ({
 
         // [新增] 处理节点添加的逻辑 (从原 setup 中提取)
         function handleNodeAdded(node) {
-            if (self.isProcessing) return;
+            if (self.isProcessing || !self.pendingReplaceNodeIds.length) return;
+            if (self.pendingReplaceNodeIds.includes(node.id)) return;
 
-            if (self.pendingReplaceNodeIds.length > 0) {
-                if (self.pendingReplaceNodeIds.includes(node.id)) return;
-
-                console.log("[ReplaceNode] 检测到新节点添加，执行批量替换...");
-
+            const graph = self.activeGraph;
+            const hook = self.nodeAddedHook;
+            // 等待 graph.add 完成，新搜索框会在 onNodeAdded 之后启动跟随鼠标。
+            scope.timeout(() => {
+                if (self.activeGraph !== graph || self.nodeAddedHook !== hook) return;
+                if (graph.getNodeById(node.id) !== node) return;
+                if (app.canvas.state.ghostNodeId === node.id) {
+                    app.canvas.finalizeGhostPlacement(false);
+                }
                 handleBatchReplace(node);
                 exitReplaceMode();
-            }
+            }, 0);
         }
 
         function handleBatchReplace(templateNode) {
@@ -434,39 +431,72 @@ function nodeElement(node) {
     return document.querySelector(`.lg-node[data-node-id="${CSS.escape(String(node.id))}"]`);
 }
 
-let nextId = 0;
-
+// 使用独立 Canvas，避免 CSS box-shadow 的模糊算法和节点自身 filter 叠加。
 function highlightNodes(nodes, { color, opacity, glow, stroke }) {
-    const graph = app.canvas.graph;
-    const token = String(++nextId);
-    const marked = new Set();
-    const style = document.createElement("style");
-    style.textContent = `
-        .lg-node[data-alignlayout-replace="${token}"]::after {
-            content: ""; position: absolute; inset: -5px; border-radius: 10px;
-            border: ${stroke}px solid ${color}; box-shadow: 0 0 ${glow}px ${color};
-            background: color-mix(in srgb, ${color} ${opacity * 100}%, transparent);
-            pointer-events: none; z-index: 10;
-        }
-    `;
-    document.head.appendChild(style);
+    const graphCanvas = app.canvas;
+    const graph = graphCanvas.graph;
+    const overlay = document.createElement("canvas");
+    overlay.className = "alignlayout-replace-highlight";
+    Object.assign(overlay.style, {
+        position: "fixed", pointerEvents: "none", zIndex: "10"
+    });
+    graphCanvas.canvas.parentElement.appendChild(overlay);
+    const ctx = overlay.getContext("2d");
+    let frame;
+    let previousGeometry = "";
+
     const refresh = () => {
-        if (app.canvas.graph !== graph) return;
-        for (const node of nodes) {
-            if (graph.getNodeById(node.id) !== node) continue;
-            const element = nodeElement(node);
-            if (element) {
-                element.setAttribute("data-alignlayout-replace", token);
-                marked.add(element);
+        const viewport = graphCanvas.canvas.getBoundingClientRect();
+        const scale = graphCanvas.ds.scale;
+        const bounds = nodes.map(node => {
+            if (app.canvas.graph !== graph || graph.getNodeById(node.id) !== node) return null;
+            return nodeElement(node)?.getBoundingClientRect();
+        }).filter(rect => rect && rect.width && rect.height);
+        const geometry = [viewport.left, viewport.top, viewport.width, viewport.height,
+            graphCanvas.canvas.width, graphCanvas.canvas.height, scale,
+            ...bounds.flatMap(rect => [rect.left, rect.top, rect.width, rect.height])].join(",");
+
+        if (geometry !== previousGeometry && viewport.width && viewport.height) {
+            previousGeometry = geometry;
+            overlay.width = graphCanvas.canvas.width;
+            overlay.height = graphCanvas.canvas.height;
+            Object.assign(overlay.style, {
+                left: `${viewport.left}px`, top: `${viewport.top}px`,
+                width: `${viewport.width}px`, height: `${viewport.height}px`
+            });
+            // 与默认画布相同的 backing 分辨率和缩放；shadowBlur 不随变换缩放。
+            ctx.setTransform(overlay.width / viewport.width * scale, 0, 0,
+                overlay.height / viewport.height * scale, 0, 0);
+            ctx.shadowColor = color;
+            ctx.shadowBlur = glow;
+            ctx.strokeStyle = color;
+            ctx.lineWidth = stroke;
+            ctx.fillStyle = hexToRgba(color, opacity);
+            for (const rect of bounds) {
+                ctx.beginPath();
+                ctx.roundRect((rect.left - viewport.left) / scale - 5,
+                    (rect.top - viewport.top) / scale - 5,
+                    rect.width / scale + 10, rect.height / scale + 10, 10);
+                ctx.fill();
+                ctx.stroke();
             }
         }
+        frame = requestAnimationFrame(refresh);
     };
-    const observer = new MutationObserver(refresh);
-    observer.observe(document.body, { childList: true, subtree: true });
     refresh();
     return () => {
-        observer.disconnect();
-        for (const element of marked) element.removeAttribute("data-alignlayout-replace");
-        style.remove();
+        cancelAnimationFrame(frame);
+        overlay.remove();
     };
+}
+
+function hexToRgba(input, alpha) {
+    if (!input) return input;
+    let hex = input.toString().trim();
+    if (hex.startsWith("0x")) hex = hex.slice(2);
+    else if (hex.startsWith("#")) hex = hex.slice(1);
+    if (!/^[0-9A-Fa-f]{3}$|^[0-9A-Fa-f]{6}$/.test(hex)) return input;
+    if (hex.length === 3) hex = hex.split('').map(char => char + char).join('');
+    const value = parseInt(hex, 16);
+    return `rgba(${(value >> 16) & 255},${(value >> 8) & 255},${value & 255},${alpha})`;
 }

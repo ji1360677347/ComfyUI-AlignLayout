@@ -156,6 +156,8 @@ export const createReplaceNode = (scope) => ({
 
                     ctx.shadowColor = glowColor;
                     ctx.shadowBlur = glowStrengthSetting;
+                    ctx.shadowOffsetX = 0;
+                    ctx.shadowOffsetY = 0;
                     ctx.strokeStyle = borderColor;
                     ctx.lineWidth = strokeWidthSetting;
                     ctx.fillStyle = fillColor;
@@ -207,27 +209,19 @@ export const createReplaceNode = (scope) => ({
                 const screenY = self.lastMousePos.y;
 
                 const graphCanvas = app.canvas;
-                const ds = graphCanvas.ds;
-                const canvasRect = graphCanvas.canvas.getBoundingClientRect();
-
-                const canvasX = (screenX - canvasRect.left) / ds.scale - ds.offset[0];
-                const canvasY = (screenY - canvasRect.top) / ds.scale - ds.offset[1];
-
-                const dummyEvent = {
-                    type: "contextmenu",
-                    clientX: screenX,
-                    clientY: screenY,
-                    canvasX: canvasX,
-                    canvasY: canvasY,
-                    preventDefault: () => {},
-                    stopPropagation: () => {}
-                };
+                const searchEvent = new MouseEvent("dblclick", {
+                    clientX: screenX, clientY: screenY, button: 0
+                });
+                graphCanvas.adjustMouseEvent(searchEvent);
 
                 // [修复] 使用 setTimeout 延迟弹出，防止按键事件冲突导致搜索框失去焦点而自动关闭
                 // [V2] 增加延迟到 100ms，确保 Shift+R 的 keyup 事件完全处理完毕
                 scope.timeout(() => {
                     if (self.pendingReplaceNodeIds.length && self.activeGraph === app.canvas.graph) {
-                        app.canvas.showSearchBox(dummyEvent);
+                        // 与双击画布相同的入口，由 ComfyUI 按搜索框设置打开界面。
+                        graphCanvas.emitEvent({
+                            subType: "empty-double-click", originalEvent: searchEvent
+                        });
                     }
                 }, 100);
             }
@@ -286,16 +280,21 @@ export const createReplaceNode = (scope) => ({
 
         // [新增] 处理节点添加的逻辑 (从原 setup 中提取)
         function handleNodeAdded(node) {
-            if (self.isProcessing) return;
+            if (self.isProcessing || !self.pendingReplaceNodeIds.length) return;
+            if (self.pendingReplaceNodeIds.includes(node.id)) return;
 
-            if (self.pendingReplaceNodeIds.length > 0) {
-                if (self.pendingReplaceNodeIds.includes(node.id)) return;
-
-                console.log("[ReplaceNode] 检测到新节点添加，执行批量替换...");
-
+            const graph = self.activeGraph;
+            const hook = self.nodeAddedHook;
+            // 等待 graph.add 完成，新搜索框会在 onNodeAdded 之后启动跟随鼠标。
+            scope.timeout(() => {
+                if (self.activeGraph !== graph || self.nodeAddedHook !== hook) return;
+                if (graph.getNodeById(node.id) !== node) return;
+                if (app.canvas.state.ghostNodeId === node.id) {
+                    app.canvas.finalizeGhostPlacement(false);
+                }
                 handleBatchReplace(node);
                 exitReplaceMode();
-            }
+            }, 0);
         }
 
         function handleBatchReplace(templateNode) {
