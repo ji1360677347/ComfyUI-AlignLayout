@@ -21,10 +21,10 @@
     },
     "FastLink_MatchStrategy": {
         "name": "端口匹配优先级",
-        "tooltip": "决定连接时如何选择最佳端口。'严格'模式要求名称和类型都匹配，'宽松'模式仅要求类型匹配。",
+        "tooltip": "两种模式均使用 ComfyUI 的类型兼容规则。“名称优先”会优先连接同名端口，名称不同也可连接；“仅类型兼容”忽略端口名称。",
         "options": {
-            "Name + Type (Strict)": "名称 + 类型 (严格)",
-            "Type Only (Loose)": "仅类型 (宽松)"
+            "Compatible Type, Name Preferred": "类型兼容，名称优先",
+            "Compatible Type Only": "仅类型兼容"
         }
     },
 

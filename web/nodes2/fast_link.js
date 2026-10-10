@@ -42,6 +42,8 @@ export const createFastLink = (scope) => ({
 
                 if (e.ctrlKey && e.shiftKey && e.altKey) {
                     cmdType = "CMD_CLEAR_INTERNAL";
+                } else if (e.shiftKey && e.altKey) {
+                    cmdType = "CMD_CLEAR_EXTERNAL";
                 } else if (e.altKey) {
                     cmdType = "ALT_KEY";
                 } else if (e.ctrlKey && e.shiftKey) {
@@ -85,66 +87,50 @@ export const createFastLink = (scope) => ({
 
         const offset = this.commandState.count;
 
-        // 轮询模式下，先断开旧连线以便切换
+        // 轮询成功后再清理旧线，连接被拒绝时保留原有连接。
         switch (cmdType) {
-            case "KEY":
+            case "KEY": {
                 // 多对一 (F)
-                if (offset > 0) {
-                    const nodes = this.getSortedSelection();
-                    if (nodes.length >= 2) {
-                        const target = nodes[nodes.length - 1];
-                        const sources = nodes.slice(0, nodes.length - 1);
-                        this.disconnectLinksBetween(sources, [target]);
-                    }
-                }
-                this.connectManyToOne({ offset: offset, cycleTargetSlots: offset > 0 });
+                const nodes = this.getSortedSelection();
+                this.reconnectSelectedLinks(nodes.slice(0, -1), nodes.slice(-1), offset,
+                    options => this.connectManyToOne({ ...options, offset, cycleTargetSlots: offset > 0 }));
                 break;
+            }
 
-            case "SHIFT_KEY":
+            case "SHIFT_KEY": {
                 // 一对多 (Shift+F)
-                if (offset > 0) {
-                    const nodes = this.getSortedSelectionStrict();
-                    if (nodes.length >= 2) {
-                        const source = nodes[0];
-                        const targets = nodes.slice(1);
-                        this.disconnectLinksBetween([source], targets);
-                    }
-                }
-                this.connectOneToMany({ offset: offset, cycleSourceSlots: offset > 0 });
+                const nodes = this.getSortedSelectionStrict();
+                this.reconnectSelectedLinks(nodes.slice(0, 1), nodes.slice(1), offset,
+                    options => this.connectOneToMany({ ...options, offset, cycleSourceSlots: offset > 0 }));
                 break;
+            }
 
-            case "CTRL_KEY":
+            case "CTRL_KEY": {
                 // 强制多对一 (Ctrl+F)
-                if (offset > 0) {
-                    const nodes = this.getSortedSelection();
-                    if (nodes.length >= 2) {
-                        const target = nodes[nodes.length - 1];
-                        const sources = nodes.slice(0, nodes.length - 1);
-                        this.disconnectLinksBetween(sources, [target]);
-                    }
-                }
-                this.connectManyToOne({ offset: offset, force: true, cycleSourceNodes: offset > 0 });
+                const nodes = this.getSortedSelection();
+                this.reconnectSelectedLinks(nodes.slice(0, -1), nodes.slice(-1), offset,
+                    options => this.connectManyToOne({ ...options, offset, force: true, cycleSourceNodes: offset > 0 }));
                 break;
+            }
 
-            case "CTRL_SHIFT_KEY":
+            case "CTRL_SHIFT_KEY": {
                 // 强制一对多 (Ctrl+Shift+F)
-                if (offset > 0) {
-                    const nodes = this.getSortedSelectionStrict();
-                    if (nodes.length >= 2) {
-                        const source = nodes[0];
-                        const targets = nodes.slice(1);
-                        this.disconnectLinksBetween([source], targets);
-                    }
-                }
-                this.connectOneToMany({ offset: offset, force: true, cycleTargetNodes: offset > 0 });
+                const nodes = this.getSortedSelectionStrict();
+                this.reconnectSelectedLinks(nodes.slice(0, 1), nodes.slice(1), offset,
+                    options => this.connectOneToMany({ ...options, offset, force: true, cycleTargetNodes: offset > 0 }));
                 break;
+            }
 
             case "ALT_KEY":
                 this.connectDaisyChain();
                 break;
 
             case "CMD_CLEAR_INTERNAL":
-                this.clearSelectedInternalLinks();
+                this.clearSelectedLinks(false);
+                break;
+
+            case "CMD_CLEAR_EXTERNAL":
+                this.clearSelectedLinks(true);
                 break;
         }
     },
@@ -159,82 +145,62 @@ export const createFastLink = (scope) => ({
         return this.sortNodesByStrictLeft(Object.values(app.canvas.selected_nodes));
     },
 
-    disconnectLinksBetween(sources, targets) {
+    reconnectSelectedLinks(sources, targets, offset, connect) {
         if (!sources.length || !targets.length) return;
-
+        if (offset === 0) return connect({});
         const graph = app.canvas.graph;
-
         const sourceIds = new Set(sources.map(n => n.id));
-        let changed = false;
-
+        const oldLinks = [];
         for (const target of targets) {
-            if (!target.inputs) continue;
-            for (let i = 0; i < target.inputs.length; i++) {
-                const linkId = target.inputs[i].link;
-                if (linkId !== null) {
-                    const link = graph.links[linkId];
-                    if (link && sourceIds.has(link.origin_id)) {
-                        target.disconnectInput(i);
-                        changed = true;
-                    }
-                }
+            for (const input of target.inputs || []) {
+                const link = graph.links[input.link];
+                if (link && sourceIds.has(link.origin_id)) oldLinks.push(link);
             }
         }
-        if (changed) graph.setDirtyCanvas(true, true);
+        const failedInputs = new Set();
+        if (!connect({ reconnectSources: sourceIds, failedInputs })) return;
+        for (const link of oldLinks) {
+            if (graph.links[link.id] && !failedInputs.has(`${link.target_id}_${link.target_slot}`)) {
+                graph.removeLink(link.id);
+            }
+        }
+        graph.setDirtyCanvas(true, true);
     },
 
-    clearSelectedInternalLinks() {
+    clearSelectedLinks(external) {
         const selectedNodes = Object.values(app.canvas.selected_nodes || {});
         if (selectedNodes.length === 0) return;
 
         const graph = app.canvas.graph;
+        const selectedNodeIds = new Set(selectedNodes.map(node => node.id));
+        const linkIds = new Set();
+        for (const node of selectedNodes) {
+            for (const input of node.inputs || []) {
+                if (input.link != null) linkIds.add(input.link);
+            }
+            for (const output of node.outputs || []) {
+                for (const linkId of output.links || []) linkIds.add(linkId);
+            }
+        }
+
         let changed = false;
-
-        // 单选模式：断开该节点的所有连接（输入和输出）
-        if (selectedNodes.length === 1) {
-            const node = selectedNodes[0];
-
-            // 1. 断开所有输入
-            if (node.inputs) {
-                for (let i = 0; i < node.inputs.length; i++) {
-                    if (node.inputs[i].link !== null) {
-                        node.disconnectInput(i);
-                        changed = true;
-                    }
-                }
-            }
-
-            // 2. 断开所有输出
-            if (node.outputs) {
-                for (let i = 0; i < node.outputs.length; i++) {
-                    if (node.outputs[i].links && node.outputs[i].links.length > 0) {
-                        node.disconnectOutput(i);
-                        changed = true;
-                    }
-                }
-            }
+        for (const linkId of linkIds) {
+            const link = graph.links[linkId];
+            if (!link) continue;
+            const sourceSelected = selectedNodeIds.has(link.origin_id);
+            const targetSelected = selectedNodeIds.has(link.target_id);
+            const shouldDisconnect = external
+                ? sourceSelected !== targetSelected
+                : sourceSelected && targetSelected;
+            if (!shouldDisconnect) continue;
+            if (!changed) graph.beforeChange();
+            graph.removeLink(linkId);
+            changed = true;
         }
-        // 多选模式：仅断开选中节点内部的连接
-        else {
-            const selectedNodeIds = new Set(selectedNodes.map(n => n.id));
-
-            for (const node of selectedNodes) {
-                if (!node.inputs) continue;
-                for (let i = 0; i < node.inputs.length; i++) {
-                    const linkId = node.inputs[i].link;
-                    if (linkId !== null) {
-                        const link = graph.links[linkId];
-                        // 只有当连线的起点也在选中列表中时，才断开
-                        if (link && selectedNodeIds.has(link.origin_id)) {
-                            node.disconnectInput(i);
-                            changed = true;
-                        }
-                    }
-                }
-            }
+        if (changed) {
+            graph.afterChange();
+            graph.setDirtyCanvas(true, true);
         }
-
-        if (changed) graph.setDirtyCanvas(true, true);
     },
 
     sortNodesByVisualColumns(nodes) {
@@ -266,124 +232,102 @@ export const createFastLink = (scope) => ({
         });
     },
 
+    getConnectionScore(output, input, matchStrategy) {
+        if (!LiteGraph.isValidConnection(output.type, input.type)) return -1;
+        if (!input.type || !output.type || input.type === "*" || output.type === "*") return 1;
+        if (matchStrategy === "type_only") return 3;
+        return (input.name || "").toUpperCase() === (output.name || "").toUpperCase() ? 3 : 2;
+    },
+
     connectSourcesToTarget(sources, targetNode, options = {}) {
         if (!targetNode.inputs) return false;
-
         const {
             force = false,
             offset = 0,
             cycleTargetSlots = false,
             cycleSourceSlots = false,
-            sharedUsedOutputs = null
+            sharedUsedOutputs = null,
+            reconnectSources = null,
+            failedInputs = null
         } = options;
-
-        let connectionMade = false;
-
-        // 如果外部没有传，则使用局部的 Set
         const usedSourceOutputs = sharedUsedOutputs || new Set();
-
-        const inputCount = targetNode.inputs.length;
         const matchStrategy = getSetting("FastLink.MatchStrategy", "name_type");
-
         const graph = app.canvas.graph;
+        const slots = [];
 
-        for (let k = 0; k < inputCount; k++) {
-            const i = cycleTargetSlots ? (k + offset) % inputCount : k;
-            const input = targetNode.inputs[i];
-
-            if (input.link && !force) continue;
-
-            let bestMatch = null;
-            let bestMatchScore = -1; // 初始分设为 -1，允许 0 分以上的任何匹配
-
+        for (const [inputIndex, input] of targetNode.inputs.entries()) {
+            const oldLink = graph.links[input.link];
+            if (input.link != null && !force && !reconnectSources?.has(oldLink?.origin_id)) continue;
+            const candidates = [];
             for (const sourceNode of sources) {
-                if (!sourceNode.outputs) continue;
-                const outputCount = sourceNode.outputs.length;
-
-                for (let m = 0; m < outputCount; m++) {
-                    const j = cycleSourceSlots ? (m + offset) % outputCount : m;
-                    const output = sourceNode.outputs[j];
-
-                    const outputId = `${sourceNode.id}_${j}`;
-
-                    // 1. 如果不是轮询模式，我们需要检查端口占用
-                    // 2. 如果是 ManyToOne (sharedUsedOutputs 为空)，通常不希望重复连同一个源端口，所以 continue
-                    // 3. 如果是 OneToMany (sharedUsedOutputs 存在)，我们希望允许复用(降级)，所以这里不 continue
-                    if (!cycleSourceSlots && usedSourceOutputs.has(outputId)) {
-                        if (!sharedUsedOutputs) {
-                            continue; // 多对一：严格跳过已用端口
-                        }
-                        // 一对多：允许进入下方逻辑，进行降权评分
-                    }
-
-                    if (input.link) {
-                        const link = graph.links[input.link];
-                        if (link && link.origin_id === sourceNode.id && link.origin_slot === j) continue;
-                    }
-
-                    // --- 匹配评分逻辑 ---
-                    let currentScore = 0;
-                    const inputType = input.type;
-                    const outputType = output.type;
-                    const isInputWildcard = inputType === "*" || inputType === "REROUTE";
-                    const isOutputWildcard = outputType === "*" || outputType === "REROUTE";
-
-                    // 【修复】增强兼容性判定：如果类型完全相等或包含通配符，或列表类型存在交集
-                    let isCompatible = (inputType === outputType) || isInputWildcard || isOutputWildcard;
-
-                    // 尝试处理 "VIDEO,STRING" 这种多类型情况
-                    if (!isCompatible && typeof inputType === "string" && typeof outputType === "string") {
-                        if (inputType.includes(",") || outputType.includes(",")) {
-                            // 分割并去除空格
-                            const iTypes = inputType.split(",").map(t => t.trim());
-                            const oTypes = outputType.split(",").map(t => t.trim());
-                            // 检查是否有交集
-                            isCompatible = iTypes.some(t => oTypes.includes(t));
-                        }
-                    }
-
-                    if (!isCompatible) continue;
-
-                    // 1. 基础匹配分 (1 ~ 3 分)
-                    if (isInputWildcard || isOutputWildcard) {
-                        currentScore = 1;
-                    } else if (matchStrategy === "type_only") {
-                        currentScore = 3;
-                    } else {
-                        const inputName = (input.name || "").toUpperCase();
-                        const outputName = (output.name || "").toUpperCase();
-                        if (inputName === outputName) {
-                            currentScore = 3;
-                        } else {
-                            currentScore = 2;
-                        }
-                    }
-
-                    // 2. 占用状态分 (0 或 10 分)
-                    // 奖励机制：未被占用的端口获得高额奖励
-                    if (sharedUsedOutputs && usedSourceOutputs.has(outputId)) {
-                        // 已被占用：不加奖励分 (保持基础分 1~3，大于初始值 -1，所以能被选中)
-                        // currentScore += 0;
-                    } else {
-                         // 未被占用：给予高额奖励 (基础分 + 10 = 11~13)
-                         currentScore += 10;
-                    }
-
-                    if (currentScore > bestMatchScore) {
-                        bestMatchScore = currentScore;
-                        bestMatch = { sourceNode, outputIndex: j };
-                    }
+                if (sourceNode === targetNode) continue;
+                for (const [outputIndex, output] of (sourceNode.outputs || []).entries()) {
+                    if (!reconnectSources && oldLink?.origin_id === sourceNode.id && oldLink.origin_slot === outputIndex) continue;
+                    const score = this.getConnectionScore(output, input, matchStrategy);
+                    if (score < 0) continue;
+                    candidates.push({ sourceNode, outputIndex, outputId: `${sourceNode.id}_${outputIndex}`, score, targetRank: 0 });
                 }
             }
+            candidates.sort((a, b) => b.score - a.score);
+            if (candidates.length) slots.push({ inputIndex, candidates });
+        }
 
-            if (bestMatch) {
-                if (input.link && force) {
-                    targetNode.disconnectInput(i);
+        if (cycleTargetSlots) {
+            // 每个输出按自己的兼容输入轮询，名称评分只决定起始顺序。
+            const inputsByOutput = new Map();
+            for (const slot of slots) {
+                for (const candidate of slot.candidates) {
+                    if (!inputsByOutput.has(candidate.outputId)) inputsByOutput.set(candidate.outputId, []);
+                    inputsByOutput.get(candidate.outputId).push(candidate);
                 }
-                bestMatch.sourceNode.connect(bestMatch.outputIndex, targetNode, i);
-                usedSourceOutputs.add(`${bestMatch.sourceNode.id}_${bestMatch.outputIndex}`);
+            }
+            for (const candidates of inputsByOutput.values()) {
+                candidates.sort((a, b) => b.score - a.score);
+                candidates.forEach((candidate, rank) => {
+                    candidate.targetCount = candidates.length;
+                    candidate.targetRank = (rank - offset % candidates.length + candidates.length) % candidates.length;
+                });
+            }
+        }
+        for (const slot of slots) {
+            slot.candidates.sort((a, b) => a.targetRank - b.targetRank || b.score - a.score);
+            // 单输入兼容组轮询来源；多输入兼容组只轮询输入，避免两次轮换抵消。
+            const cycleSources = cycleSourceSlots ||
+                (cycleTargetSlots && slot.candidates.every(candidate => candidate.targetCount === 1));
+            const sourceOffset = cycleSources ? offset : 0;
+            const candidateGroups = new Map();
+            for (const candidate of slot.candidates) {
+                if (!candidateGroups.has(candidate.targetRank)) candidateGroups.set(candidate.targetRank, []);
+                candidateGroups.get(candidate.targetRank).push(candidate);
+            }
+            for (const candidates of candidateGroups.values()) {
+                candidates.forEach((candidate, rank) => {
+                    candidate.sourceRank = (rank - sourceOffset % candidates.length + candidates.length) % candidates.length;
+                });
+            }
+        }
+
+        if (cycleTargetSlots) {
+            // 先处理各输出本轮优先的输入，不让其他类型的端口改变匹配顺序。
+            slots.sort((a, b) => a.candidates[0].targetRank - b.candidates[0].targetRank || a.inputIndex - b.inputIndex);
+        }
+        let connectionMade = false;
+        for (const slot of slots) {
+            const candidates = slot.candidates.filter(candidate => sharedUsedOutputs || !usedSourceOutputs.has(candidate.outputId));
+            candidates.sort((a, b) =>
+                Number(usedSourceOutputs.has(a.outputId)) - Number(usedSourceOutputs.has(b.outputId)) ||
+                a.targetRank - b.targetRank || a.sourceRank - b.sourceRank);
+            let connected = false;
+            for (const candidate of candidates) {
+                // 原生 connect 会先验证并允许节点拒绝，再替换旧线。
+                const link = candidate.sourceNode.connect(candidate.outputIndex, targetNode, slot.inputIndex);
+                if (!link) continue;
+                usedSourceOutputs.add(candidate.outputId);
                 connectionMade = true;
+                connected = true;
+                break;
             }
+            if (candidates.length && !connected) failedInputs?.add(`${targetNode.id}_${slot.inputIndex}`);
         }
         return connectionMade;
     },
@@ -396,13 +340,13 @@ export const createFastLink = (scope) => ({
         let sourceNodes = nodes;
 
         if (options.cycleSourceNodes) {
-            const idx = options.offset % sourceNodes.length;
+            const idx = (options.offset - 1) % sourceNodes.length;
             sourceNodes = [sourceNodes[idx]];
         }
 
-        if (this.connectSourcesToTarget(sourceNodes, targetNode, options)) {
-            app.canvas.graph.setDirtyCanvas(true, true);
-        }
+        const changed = this.connectSourcesToTarget(sourceNodes, targetNode, options);
+        if (changed) app.canvas.graph.setDirtyCanvas(true, true);
+        return changed;
     },
 
     connectOneToMany(options = {}) {
@@ -413,7 +357,7 @@ export const createFastLink = (scope) => ({
         let targetNodes = nodes;
 
         if (options.cycleTargetNodes) {
-            const idx = options.offset % targetNodes.length;
+            const idx = (options.offset - 1) % targetNodes.length;
             targetNodes = [targetNodes[idx]];
         }
 
@@ -429,6 +373,7 @@ export const createFastLink = (scope) => ({
         }
 
         if (changed) app.canvas.graph.setDirtyCanvas(true, true);
+        return changed;
     },
 
     connectDaisyChain() {

@@ -16,12 +16,12 @@ const fastLinkSettings = [
         type: "combo",
         defaultValue: "name_type",
         options: [
-            { text: "Name + Type (Strict)", value: "name_type" },
-            { text: "Type Only (Loose)", value: "type_only" }
+            { text: "Compatible Type, Name Preferred", value: "name_type" },
+            { text: "Compatible Type Only", value: "type_only" }
         ],
         // Category: [插件名, 功能名, 设置名]
         category: ["AlignLayout", "FastLink", "Match Priority"], 
-        tooltip: "Strict: Requires both name and type match. Loose: Only checks type."
+        tooltip: "Both modes use ComfyUI's type compatibility rules. Name Preferred prioritizes matching port names; Type Only ignores names."
     },
 
     // 4. 模式重置超时时间
