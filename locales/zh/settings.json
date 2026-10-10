@@ -485,10 +485,6 @@
         "name": "收藏标记颜色",
         "tooltip": "已收藏项目的左侧标记颜色（支持 #RRGGBB 等格式）。"
     },
-    "AddNodeMenu_PrimaryCategories": {
-        "name": "首选分类列表",
-        "tooltip": "输入以逗号分隔的分类名称，这些分类将置顶显示在根菜单中。"
-    },
     "AddNodeMenu_ExcludeList": {
         "name": "排除列表 (过滤)",
         "tooltip": "输入以逗号分隔的关键词，包含这些词的分类或节点将被隐藏。"

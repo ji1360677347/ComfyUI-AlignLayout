@@ -151,6 +151,7 @@ export const createAddNodeMenu = (scope) => ({
         let overlay = null;
         let contextMenuEl = null;
         let hoverTimer = null;
+        let builtinNodeTypes = new Set();
         let globalMouse = { x: 0, y: 0 };
         let lockedCanvasPos = { x: 0, y: 0 };
 
@@ -167,12 +168,7 @@ export const createAddNodeMenu = (scope) => ({
         // 特殊键：用于存储所有被置顶的“节点”的类名 (Class Name)
         const GLOBAL_NODE_PINS_KEY = "__ALL_NODES__";
 
-        const DEFAULT_PRIMARY_CATEGORIES = [
-            "utils", "sampling", "采样", "loaders", "加载器",
-            "latent", "Latent", "_for_testing", "_用于测试",
-            "advanced", "高级", "mask", "遮罩",
-            "image", "图像", "api node", "工具", "api", "api 节点", "API"
-        ];
+        const BUILTIN_FRONTEND_NODES = new Set(["PrimitiveNode", "Note", "MarkdownNote", "Reroute"]);
 
         scope.listen(window, "mousemove", (e) => {
             globalMouse.x = e.clientX;
@@ -186,6 +182,7 @@ export const createAddNodeMenu = (scope) => ({
                 const data = await res.json();
                 if (data) {
                     cachedData = data;
+                    builtinNodeTypes = new Set(data.builtin_nodes || []);
                     if (!cachedData.pins) {
                         cachedData.pins = {};
                     }
@@ -284,12 +281,6 @@ export const createAddNodeMenu = (scope) => ({
             if (e.metaKey !== meta) return false;
 
             return true;
-        }
-
-        function getPrimaryCategories() {
-            const settingStr = app.ui.settings.getSettingValue("AddNodeMenu.PrimaryCategories", "");
-            if (!settingStr) return DEFAULT_PRIMARY_CATEGORIES;
-            return settingStr.split(/,|，/).map(s => s.trim()).filter(s => s);
         }
 
         // --- 核心逻辑函数 ---
@@ -438,10 +429,14 @@ export const createAddNodeMenu = (scope) => ({
 
             for (const className in registered) {
                 const nodeData = registered[className];
-                if (nodeData.hidden) continue;
+                if (nodeData.hidden || nodeData.skip_list) continue;
 
-                const category = nodeData.category || UNCATEGORIZED_NAME;
+                const parts = (nodeData.category || "").split('/').filter(Boolean);
+                if (!parts.length) parts.push(UNCATEGORIZED_NAME);
+                const category = parts.join('/');
                 const displayName = nodeData.title || nodeData.name || className;
+                const isOfficial = builtinNodeTypes.has(className)
+                    || (!nodeData.nodeData && BUILTIN_FRONTEND_NODES.has(className));
 
                 // 排除逻辑：检查分类名或节点名是否包含排除关键字
                 if (excludeList.length > 0) {
@@ -453,13 +448,12 @@ export const createAddNodeMenu = (scope) => ({
                     }
                 }
 
-                const parts = category.split('/');
-
                 let currentLevel = tree;
                 for (const part of parts) {
                     if (!currentLevel[part]) {
                         currentLevel[part] = { _isCategory: true, _children: {} };
                     }
+                    if (isOfficial) currentLevel[part]._hasOfficialNodes = true;
                     currentLevel = currentLevel[part]._children;
                 }
 
@@ -526,11 +520,6 @@ export const createAddNodeMenu = (scope) => ({
                     items.forEach(i => i.classList.remove('active'));
                 }
             }, { passive: false });
-        }
-
-        function getPrimaryIndex(key) {
-            const categories = getPrimaryCategories();
-            return categories.findIndex(p => p.toLowerCase() === key.toLowerCase());
         }
 
         function sortWithPins(keys, parentPath, structure, defaultSortFn) {
@@ -653,26 +642,25 @@ export const createAddNodeMenu = (scope) => ({
             let finalKeys = [];
 
             if (levelIndex === 0) {
-                const systemPrimaryGroup = [];
+                const officialGroup = [];
                 const middleGroup = [];
                 const tailGroup = [];
 
                 allKeys.forEach(key => {
                     if (key === UNCATEGORIZED_NAME) {
                         tailGroup.push(key);
-                    } else if (getPrimaryIndex(key) !== -1) {
-                        systemPrimaryGroup.push(key);
+                    } else if (structure[key]._hasOfficialNodes) {
+                        officialGroup.push(key);
                     } else {
                         middleGroup.push(key);
                     }
                 });
 
-                const primarySortFn = (a, b) => getPrimaryIndex(a) - getPrimaryIndex(b);
-                const sortedPrimary = sortWithPins(systemPrimaryGroup, parentPath, structure, (a, b) => primarySortFn(a, b));
+                const sortedOfficial = sortWithPins(officialGroup, parentPath, structure, defaultSort);
                 const sortedMiddle = sortWithPins(middleGroup, parentPath, structure, defaultSort);
                 const sortedTail = sortWithPins(tailGroup, parentPath, structure, defaultSort);
 
-                if (sortedPrimary.length > 0) finalKeys.push(...sortedPrimary);
+                if (sortedOfficial.length > 0) finalKeys.push(...sortedOfficial);
                 if (sortedMiddle.length > 0) {
                     if (finalKeys.length > 0) finalKeys.push("---SEPARATOR---");
                     finalKeys.push(...sortedMiddle);

@@ -30,20 +30,6 @@ const addNodeMenuSettings = [
         }
     },
 
-    // 10. ComfyUI基础节点 (首选分类列表)
-    {
-        id: "AddNodeMenu.PrimaryCategories",
-        name: "Primary Categories",
-        type: "text",
-        defaultValue: "utils,sampling,采样,loaders,加载器,latent,Latent,_for_testing,_用于测试,advanced,高级,mask,遮罩,image,图像,api node,工具,api,api 节点,API",
-        category: ["AlignLayout", "AddNodeMenu", "Primary Categories"],
-        tooltip: "Comma-separated list of categories to show at the top of the root menu.",
-        attrs: { 
-            placeholder: "utils, sampling, loaders...",
-            style: "width: 100%; min-width: 300px;" 
-        }
-    },
-
     // 9. 收藏标记颜色
     {
         id: "AddNodeMenu.ColorMark",
