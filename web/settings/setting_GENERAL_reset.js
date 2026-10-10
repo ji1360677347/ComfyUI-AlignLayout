@@ -1,4 +1,4 @@
-import { app } from "../../scripts/app.js";
+import { app } from "../../../scripts/app.js";
 
 // =========================================================
 // 插件: AlignLayout 全局主恢复按钮 (简化版)

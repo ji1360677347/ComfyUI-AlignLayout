@@ -1,4 +1,4 @@
-import { app } from "../../scripts/app.js";
+import { app } from "../../../scripts/app.js";
 
 // =========================================================
 // 插件: Quick Node Menu (快捷节点菜单/收藏菜单) 设置

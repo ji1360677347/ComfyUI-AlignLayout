@@ -1,7 +1,8 @@
-import { app } from "../../scripts/app.js";
+import { app } from "../../../scripts/app.js";
+import { isEditing } from "../runtime.js";
 
 // 注册扩展
-app.registerExtension({
+export const createAligner = (scope) => ({
     name: "Comfy.NodeAligner",
     async setup() {
         // --- 设置 ID 常量 ---
@@ -30,15 +31,15 @@ app.registerExtension({
         let flickStartPos = null;
         let flickStartTime = 0;
         let isTrackingFlick = false;
-        
+
         // [新增] 内存缓存变量 (刷新页面后会自动重置为 null)
         let cachedGapH = null;
         let cachedGapV = null;
 
         // 静态常量
-        const btnBg = "rgba(34, 34, 34, 0.6)"; 
-        const btnHoverBg = "rgba(68, 68, 68, 0.7)"; 
-        const iconScale = 0.7; 
+        const btnBg = "rgba(34, 34, 34, 0.6)";
+        const btnHoverBg = "rgba(68, 68, 68, 0.7)";
+        const iconScale = 0.7;
 
         // SVG 图标库
         const svgIcons = {
@@ -141,17 +142,17 @@ app.registerExtension({
             const iconHtml = getIconHtml(cmd);
             const container = document.createElement("div");
             container.style.cssText = `
-                display: flex; 
-                align-items: center; 
-                gap: 2px; 
-                background: ${btnBg}; 
+                display: flex;
+                align-items: center;
+                gap: 2px;
+                background: ${btnBg};
                 border: 1px solid rgba(102, 102, 102, 0.3);
-                border-radius: 999px; 
-                padding: 4px 8px; 
+                border-radius: 999px;
+                padding: 4px 8px;
                 pointer-events: auto;
                 box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
             `;
-            
+
             const input = document.createElement("input");
             input.type = "number";
 
@@ -159,33 +160,33 @@ app.registerExtension({
             input.value = currentValue;
 
             input.style.cssText = `
-                width: 40px; 
-                height: 24px; 
-                background: transparent; 
-                border: none; 
-                color: #666; 
-                text-align: right; 
-                font-size: 13px; 
+                width: 40px;
+                height: 24px;
+                background: transparent;
+                border: none;
+                color: #666;
+                text-align: right;
+                font-size: 13px;
                 line-height: 24px;
                 padding-top: 2px;
                 outline: none;
                 transition: color 0.2s;
             `;
-            
+
             const highlightInput = () => { input.style.color = "#c2c2c2"; };
             const dimInput = () => { if(document.activeElement !== input) input.style.color = "#666"; };
-            
+
             input.onmouseenter = highlightInput;
             input.onmouseleave = dimInput;
             input.onfocus = highlightInput;
             input.onblur = dimInput;
             input.onclick = (e) => { e.stopPropagation(); input.focus(); };
-            input.onpointerdown = (e) => e.stopPropagation(); 
+            input.onpointerdown = (e) => e.stopPropagation();
 
             // [修改] 监听输入变化，更新内存变量
             if (onInput) {
                 input.addEventListener("input", () => {
-                   onInput(input.value); 
+                   onInput(input.value);
                 });
             }
 
@@ -203,14 +204,14 @@ app.registerExtension({
             btn.innerHTML = iconHtml;
             btn.title = tooltip;
             btn.style.cssText = `
-                width: 28px; 
-                height: 28px; 
-                cursor: pointer; 
-                display: flex; 
-                align-items: center; 
+                width: 28px;
+                height: 28px;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
                 justify-content: center;
                 transition: transform 0.2s, background-color 0.2s, filter 0.2s;
-                border-radius: 50%; 
+                border-radius: 50%;
             `;
             const svg = btn.querySelector("svg");
             if (svg) {
@@ -218,18 +219,18 @@ app.registerExtension({
                 svg.style.height = "20px";
                 svg.style.display = "block";
             }
-            
-            btn.onmouseover = () => { 
-                btn.style.transform = "scale(1.15)"; 
-                btn.style.backgroundColor = "rgba(255, 255, 255, 0.1)"; 
-                btn.style.filter = "brightness(1.5)"; 
-                highlightInput(); 
+
+            btn.onmouseover = () => {
+                btn.style.transform = "scale(1.15)";
+                btn.style.backgroundColor = "rgba(255, 255, 255, 0.1)";
+                btn.style.filter = "brightness(1.5)";
+                highlightInput();
             };
-            btn.onmouseout = () => { 
-                btn.style.transform = "scale(1.0)"; 
+            btn.onmouseout = () => {
+                btn.style.transform = "scale(1.0)";
                 btn.style.backgroundColor = "transparent";
                 btn.style.filter = "none";
-                dimInput(); 
+                dimInput();
             };
             btn.onclick = (e) => { e.stopPropagation(); trigger(); };
 
@@ -242,7 +243,7 @@ app.registerExtension({
         const updateBottomRow = () => {
             bottomRow.innerHTML = ""; // 清空
             const s = app.ui.settings;
-            
+
             // 获取用户设置的默认间距
             const defGapV = s.getSettingValue(SETTING_IDS.GAP_V, 50);
             const defGapH = s.getSettingValue(SETTING_IDS.GAP_H, 50);
@@ -253,9 +254,9 @@ app.registerExtension({
 
             // 1. 左侧胶囊 (垂直分布)
             bottomRow.appendChild(createCapsuleGroup(
-                "spacing_dist_v", 
-                "Vertical Distribution Spacing (Stack & Center X)", 
-                currentV, 
+                "spacing_dist_v",
+                "Vertical Distribution Spacing (Stack & Center X)",
+                currentV,
                 (val) => cachedGapV = val // 回调更新内存变量
             ));
 
@@ -275,9 +276,9 @@ app.registerExtension({
 
             // 3. 右侧胶囊 (水平分布)
             bottomRow.appendChild(createCapsuleGroup(
-                "spacing_dist_h", 
-                "Horizontal Distribution Spacing (Row & Center Y)", 
-                currentH, 
+                "spacing_dist_h",
+                "Horizontal Distribution Spacing (Row & Center Y)",
+                currentH,
                 (val) => cachedGapH = val // 回调更新内存变量
             ));
         };
@@ -290,13 +291,13 @@ app.registerExtension({
             btn.className = "comfy-node-align-btn";
             const posType = isStatic ? "static" : "absolute";
             btn.style.cssText = `box-sizing: border-box; position: ${posType}; width: ${w}px; height: ${h}px; border-radius: 999px; border: 1px solid rgba(102, 102, 102, 0.3); background: ${btnBg}; color: white; cursor: pointer; pointer-events: auto; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); display: flex; align-items: center; justify-content: center; padding: 0; transition: transform 0.1s, background 0.2s; flex-shrink: 0;`;
-            
+
             const svg = btn.querySelector("svg");
             if (svg) {
                 const iconSize = Math.min(w, h) * iconScale;
                 svg.style.width = `${iconSize}px`; svg.style.height = `${iconSize}px`; svg.style.display = "block";
             }
-            if (!isStatic) { 
+            if (!isStatic) {
                 btn.onmouseover = () => { btn.style.background = btnHoverBg; btn.style.transform = "scale(1.08)"; };
                 btn.onmouseout = () => { btn.style.background = btnBg; btn.style.transform = "scale(1.0)"; };
             } else {
@@ -306,15 +307,17 @@ app.registerExtension({
             return btn;
         }
 
-        function closePanel() { 
-            panel.style.display = "none"; 
-            isTrackingFlick = false; 
+        function closePanel() {
+            panel.style.display = "none";
+            isTrackingFlick = false;
             window.__comfy_align_active = false;
         }
 
-        window.__comfy_align_close = closePanel;
+        scope.expose("__comfy_align_active", false);
+        scope.expose("__comfy_align_close", closePanel);
+        scope.add(() => { closePanel(); panel.remove(); });
 
-        window.addEventListener("mousemove", (e) => {
+        scope.listen(window, "mousemove", (e) => {
             const enabled = app.ui.settings.getSettingValue(SETTING_IDS.ENABLED, true);
             if (!enabled) return;
 
@@ -325,7 +328,7 @@ app.registerExtension({
                 const dist = Math.sqrt(dx * dx + dy * dy);
                 const angle = Math.atan2(dy, dx) * 180 / Math.PI;
                 pointerWrapper.style.transform = `rotate(${angle + 90}deg)`;
-                
+
                 const currentDistThreshold = app.ui.settings.getSettingValue(SETTING_IDS.FLICK_DIST, 80);
                 const currentSpeedThreshold = app.ui.settings.getSettingValue(SETTING_IDS.FLICK_SPEED, 0.6);
 
@@ -333,7 +336,7 @@ app.registerExtension({
                 if (dist > currentDistThreshold) {
                     const timeDelta = Date.now() - flickStartTime;
                     if (dist / timeDelta > currentSpeedThreshold) {
-                        isTrackingFlick = false; 
+                        isTrackingFlick = false;
                         handleFlickGesture((angle + 360) % 360);
                     }
                 }
@@ -351,7 +354,9 @@ app.registerExtension({
             alignNodes(closest.cmd);
         }
 
-        window.addEventListener("keydown", (e) => {
+        scope.listen(window, "keydown", (e) => {
+            if (e.key === "Escape") { closePanel(); return; }
+            if (isEditing(e.target)) return;
             const enabled = app.ui.settings.getSettingValue(SETTING_IDS.ENABLED, true);
             if (!enabled) return;
 
@@ -359,13 +364,13 @@ app.registerExtension({
             if (!shortcutStr) return;
 
             const keys = shortcutStr.split('+').map(k => k.trim().toLowerCase());
-            const mainKey = keys.pop(); 
-            
+            const mainKey = keys.pop();
+
             const isCtrl = keys.includes('ctrl') || keys.includes('control');
             const isAlt = keys.includes('alt') || keys.includes('option');
             const isShift = keys.includes('shift');
             const isMeta = keys.includes('meta') || keys.includes('cmd') || keys.includes('command');
-            
+
             if (e.ctrlKey !== isCtrl) return;
             if (e.altKey !== isAlt) return;
             if (e.shiftKey !== isShift) return;
@@ -373,7 +378,7 @@ app.registerExtension({
 
             const code = e.code.toLowerCase();
             const key = e.key.toLowerCase();
-            
+
             let match = false;
             if (key === mainKey) match = true;
             if (code === mainKey) match = true;
@@ -383,7 +388,7 @@ app.registerExtension({
                 const selected = Object.values(app.canvas.selected_nodes || {});
                 if (selected.length < 2) return;
                 e.preventDefault();
-                
+
                 if (window.__comfy_resizer_close) window.__comfy_resizer_close();
 
                 updateRingButtons();
@@ -399,10 +404,9 @@ app.registerExtension({
                 isTrackingFlick = true;
                 pointerWrapper.style.transform = `rotate(0deg)`;
             }
-            if (e.code === "Escape") closePanel();
         });
 
-        window.addEventListener("pointerdown", (e) => {
+        scope.listen(window, "pointerdown", (e) => {
             if (window.__comfy_align_active) {
                 if (e.target.tagName === "INPUT") return;
                 if (!e.target.closest(".comfy-node-align-btn") && !e.target.closest("input") && !e.target.closest("div[style*='border-radius: 999px']")) {
@@ -416,147 +420,94 @@ app.registerExtension({
             const nodes = Object.values(app.canvas.selected_nodes || {});
             if (nodes.length < 2) return;
             app.canvas.graph.beforeChange();
-            const b = {
-                minX: Math.min(...nodes.map(n => n.pos[0])),
-                maxX: Math.max(...nodes.map(n => n.pos[0] + n.size[0])),
-                minY: Math.min(...nodes.map(n => n.pos[1])),
-                maxY: Math.max(...nodes.map(n => n.pos[1] + n.size[1])),
-                avgCX: nodes.reduce((acc, n) => acc + (n.pos[0] + n.size[0]/2), 0) / nodes.length,
-                avgCY: nodes.reduce((acc, n) => acc + (n.pos[1] + n.size[1]/2), 0) / nodes.length
-            };
-            switch (type) {
-                case "left": nodes.forEach(n => n.pos[0] = b.minX); break;
-                case "right": nodes.forEach(n => n.pos[0] = b.maxX - n.size[0]); break;
-                case "top": nodes.forEach(n => n.pos[1] = b.minY); break;
-                case "bottom": nodes.forEach(n => n.pos[1] = b.maxY - n.size[1]); break;
-                case "h_center": nodes.forEach(n => n.pos[0] = b.avgCX - n.size[0]/2); break;
-                case "v_center": nodes.forEach(n => n.pos[1] = b.avgCY - n.size[1]/2); break;
-                
-                case "dist_h_gap": {
-                    nodes.sort((a,b)=>a.pos[0]-b.pos[0]);
-                    const tw = nodes.reduce((acc,n)=>acc+n.size[0], 0);
-                    const gap = (b.maxX-b.minX-tw)/(nodes.length-1);
-                    let x = b.minX; nodes.forEach(n=>{n.pos[0]=x; x+=n.size[0]+gap;});
-                    break;
+            try {
+                if (type === "auto_layout") {
+                    window.__comfy_auto_layout_instance?.arrangeNodes();
+                } else {
+                    alignSelection(nodes, type, value);
                 }
-                case "dist_v_gap": {
-                    nodes.sort((a,b)=>a.pos[1]-b.pos[1]);
-                    const th = nodes.reduce((acc,n)=>acc+n.size[1], 0);
-                    const gap = (b.maxY-b.minY-th)/(nodes.length-1);
-                    let y = b.minY; nodes.forEach(n=>{n.pos[1]=y; y+=n.size[1]+gap;});
-                    break;
-                }
-
-                case "spacing_dist_v": {
-                    distributeWithSpacing(nodes, 1, value, true);
-                    break;
-                }
-                case "spacing_dist_h": {
-                    distributeWithSpacing(nodes, 0, value, true);
-                    break;
-                }
-                
-                case "auto_layout": {
-                    if (window.__comfy_auto_layout_instance) {
-                        window.__comfy_auto_layout_instance.arrangeNodes();
-                    }
-                    break;
-                }
+            } finally {
+                app.canvas.graph.afterChange();
+                app.canvas.draw(true, true);
+                closePanel();
             }
-            app.canvas.graph.afterChange(); app.canvas.draw(true, true); closePanel();
-        }
-
-        // --- 智能锚点查找函数 ---
-        function getAnchorNode(nodes, axis) {
-            const primaryProp = axis === 0 ? 0 : 1; 
-            const secondaryProp = axis === 0 ? 1 : 0; 
-
-            // 1. 找到主轴上的最小值
-            const minVal = Math.min(...nodes.map(n => n.pos[primaryProp]));
-            
-            // 2. 筛选出在容差范围内 (5px) 的“最左/最上”候选节点
-            const tolerance = 5;
-            let candidates = nodes.filter(n => n.pos[primaryProp] <= minVal + tolerance);
-
-            // 3. 按副轴排序
-            candidates.sort((a, b) => a.pos[secondaryProp] - b.pos[secondaryProp]);
-            
-            // 筛选出副轴上也是“最靠前”的节点 (容差5px)
-            const minSecVal = candidates[0].pos[secondaryProp];
-            candidates = candidates.filter(n => n.pos[secondaryProp] <= minSecVal + tolerance);
-
-            // 4. 优先选择“工作流开头”节点
-            const isStartNode = (n) => {
-                if (!n.inputs || n.inputs.length === 0) return true;
-                return !n.inputs.some(inp => inp.link !== null);
-            };
-
-            const startNodes = candidates.filter(isStartNode);
-            if (startNodes.length > 0) {
-                candidates = startNodes;
-            }
-
-            // 5. 最后使用 ID 排序兜底
-            candidates.sort((a, b) => a.id - b.id);
-
-            return candidates[0];
-        }
-
-        // --- 优化后的间距分布函数 ---
-        function distributeWithSpacing(nodes, axis, gap, alignCrossAxis) {
-            // 1. 智能选择锚点
-            const anchor = getAnchorNode(nodes, axis);
-
-            // 2. 将锚点从列表中移除，剩余节点进行排序
-            let remaining = nodes.filter(n => n.id !== anchor.id);
-            const crossAxis = axis === 0 ? 1 : 0;
-            
-            remaining.sort((a, b) => {
-                const diff1 = a.pos[axis] - b.pos[axis];
-                if (Math.abs(diff1) > 5) return diff1;
-                
-                const diff2 = a.pos[crossAxis] - b.pos[crossAxis];
-                if (Math.abs(diff2) > 5) return diff2;
-
-                return a.id - b.id;
-            });
-
-            // 3. 构建最终处理队列，锚点必须在第一位
-            const sorted = [anchor, ...remaining];
-
-            const getVisualSize = (node, ax) => {
-                if (ax === 1) { 
-                    if (node.type === "Reroute" || node.type === "Reroute (rgthree)") {
-                        return node.size[1];
-                    }
-                    const titleHeight = (window.LiteGraph && window.LiteGraph.NODE_TITLE_HEIGHT) || 30;
-                    return node.size[1] + titleHeight;
-                }
-                return node.size[0];
-            };
-            
-            // 初始化位置
-            let currentPos = anchor.pos[axis] + getVisualSize(anchor, axis) + gap;
-            
-            // 计算副轴对齐中心 (基于锚点)
-            const anchorVisualSizeOnCross = getVisualSize(anchor, crossAxis);
-            const anchorCenter = anchor.pos[crossAxis] + anchorVisualSizeOnCross / 2;
-
-            sorted.forEach((n, i) => {
-                if (i === 0) return; // 锚点位置不动
-
-                // 更新主轴位置
-                n.pos[axis] = currentPos;
-                
-                // 累加位置
-                currentPos += getVisualSize(n, axis) + gap;
-
-                if (alignCrossAxis) {
-                    // 更新副轴位置 (居中对齐)
-                    const myVisualSizeOnCross = getVisualSize(n, crossAxis);
-                    n.pos[crossAxis] = anchorCenter - myVisualSizeOnCross / 2;
-                }
-            });
         }
     }
 });
+
+function titleHeight() {
+    return LiteGraph.NODE_TITLE_HEIGHT;
+}
+
+function size(node) {
+    return [...node.renderingSize];
+}
+
+function bounds(node) {
+    const [width, height] = size(node);
+    const title = titleHeight(node);
+    return { x: node.pos[0], y: node.pos[1] - title, width, height: height + title };
+}
+
+function setPosition(node, x, y) {
+    node.pos = [x, y + titleHeight(node)];
+}
+
+function ordered(nodes, axis) {
+    const cross = axis === "x" ? "y" : "x";
+    const first = Math.min(...nodes.map(node => bounds(node)[axis]));
+    let candidates = nodes.filter(node => bounds(node)[axis] <= first + 5);
+    const secondary = Math.min(...candidates.map(node => bounds(node)[cross]));
+    candidates = candidates.filter(node => bounds(node)[cross] <= secondary + 5);
+    const sources = candidates.filter(node => !node.inputs?.some(input => input.link != null));
+    const anchor = (sources.length ? sources : candidates).sort((a, b) => a.id - b.id)[0];
+    const rest = nodes.filter(node => node !== anchor).sort((a, b) => {
+        const primary = bounds(a)[axis] - bounds(b)[axis];
+        if (Math.abs(primary) > 5) return primary;
+        const secondary = bounds(a)[cross] - bounds(b)[cross];
+        return Math.abs(secondary) > 5 ? secondary : a.id - b.id;
+    });
+    return [anchor, ...rest];
+}
+
+function alignSelection(nodes, command, gap) {
+    const boxes = nodes.map(bounds);
+    const left = Math.min(...boxes.map(box => box.x));
+    const right = Math.max(...boxes.map(box => box.x + box.width));
+    const top = Math.min(...boxes.map(box => box.y));
+    const bottom = Math.max(...boxes.map(box => box.y + box.height));
+    const centerX = boxes.reduce((sum, box) => sum + box.x + box.width / 2, 0) / nodes.length;
+    const centerY = boxes.reduce((sum, box) => sum + box.y + box.height / 2, 0) / nodes.length;
+    if (command.startsWith("dist_") || command.startsWith("spacing_dist_")) {
+        const horizontal = command.endsWith("h") || command === "dist_h_gap";
+        const axis = horizontal ? "x" : "y";
+        const dimension = horizontal ? "width" : "height";
+        const fixed = command.startsWith("spacing_");
+        const sorted = fixed ? ordered(nodes, axis) : [...nodes].sort((a, b) => bounds(a)[axis] - bounds(b)[axis]);
+        const anchor = bounds(sorted[0]);
+        const total = boxes.reduce((sum, box) => sum + box[dimension], 0);
+        const spacing = fixed ? gap : ((horizontal ? right - left : bottom - top) - total) / (nodes.length - 1);
+        let cursor = fixed ? anchor[axis] : (horizontal ? left : top);
+        for (const node of sorted) {
+            const box = bounds(node);
+            const x = horizontal ? cursor : (fixed ? anchor.x + (anchor.width - box.width) / 2 : box.x);
+            const y = horizontal ? (fixed ? anchor.y + (anchor.height - box.height) / 2 : box.y) : cursor;
+            setPosition(node, x, y);
+            cursor += box[dimension] + spacing;
+        }
+        return;
+    }
+    for (const node of nodes) {
+        const box = bounds(node);
+        let x = box.x, y = box.y;
+        switch (command) {
+            case "left": x = left; break;
+            case "right": x = right - box.width; break;
+            case "top": y = top; break;
+            case "bottom": y = bottom - box.height; break;
+            case "h_center": x = centerX - box.width / 2; break;
+            case "v_center": y = centerY - box.height / 2; break;
+        }
+        setPosition(node, x, y);
+    }
+}

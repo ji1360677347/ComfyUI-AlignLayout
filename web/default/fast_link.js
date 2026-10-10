@@ -1,4 +1,5 @@
-import { app } from "../../scripts/app.js";
+import { app } from "../../../scripts/app.js";
+import { isEditing } from "../runtime.js";
 
 // =========================================================
 // 辅助函数：获取设置值
@@ -12,10 +13,10 @@ function getSetting(id, defaultValue) {
 // 插件逻辑
 // =========================================================
 
-app.registerExtension({
+export const createFastLink = (scope) => ({
     name: "Comfy.FastLink",
-    
-    init() {
+
+    setup() {
         this.commandState = {
             lastCmd: null,
             count: 0,
@@ -23,34 +24,34 @@ app.registerExtension({
             lastSelection: ""
         };
 
-        window.addEventListener("keydown", (e) => {
+        scope.listen(window, "keydown", (e) => {
             const enabled = getSetting("FastLink.Enabled", true);
             if (!enabled) return;
 
             const shortcutConfig = getSetting("FastLink.Shortcut", "F");
-            const triggerKey = (shortcutConfig && shortcutConfig.length > 0) 
-                ? shortcutConfig.charAt(0).toUpperCase() 
+            const triggerKey = (shortcutConfig && shortcutConfig.length > 0)
+                ? shortcutConfig.charAt(0).toUpperCase()
                 : "F";
-            
+
             if (e.key.toUpperCase() === triggerKey) {
                 // 避免在输入框中触发
-                if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
-                if (e.metaKey) return; 
+                if (isEditing(e.target)) return;
+                if (e.metaKey) return;
 
                 let cmdType = null;
-                
+
                 if (e.ctrlKey && e.shiftKey && e.altKey) {
-                    cmdType = "CMD_CLEAR_INTERNAL"; 
+                    cmdType = "CMD_CLEAR_INTERNAL";
                 } else if (e.altKey) {
-                    cmdType = "ALT_KEY"; 
+                    cmdType = "ALT_KEY";
                 } else if (e.ctrlKey && e.shiftKey) {
-                    cmdType = "CTRL_SHIFT_KEY"; 
+                    cmdType = "CTRL_SHIFT_KEY";
                 } else if (e.ctrlKey) {
-                    cmdType = "CTRL_KEY"; 
+                    cmdType = "CTRL_KEY";
                 } else if (e.shiftKey) {
-                    cmdType = "SHIFT_KEY"; 
+                    cmdType = "SHIFT_KEY";
                 } else {
-                    cmdType = "KEY"; 
+                    cmdType = "KEY";
                 }
 
                 if (cmdType) {
@@ -66,13 +67,13 @@ app.registerExtension({
         const currentSelectedNodes = app.canvas.selected_nodes || {};
         const currentIds = Object.keys(currentSelectedNodes).sort().join(",");
         const now = Date.now();
-        
+
         const resetTimeout = getSetting("FastLink.ResetTimeout", 2000);
 
-        if (currentIds !== this.commandState.lastSelection || 
-            cmdType !== this.commandState.lastCmd || 
+        if (currentIds !== this.commandState.lastSelection ||
+            cmdType !== this.commandState.lastCmd ||
             (now - this.commandState.lastTime > resetTimeout)) {
-            
+
             this.commandState.count = 0;
             this.commandState.lastSelection = currentIds;
             this.commandState.lastCmd = cmdType;
@@ -86,7 +87,7 @@ app.registerExtension({
 
         // 轮询模式下，先断开旧连线以便切换
         switch (cmdType) {
-            case "KEY": 
+            case "KEY":
                 // 多对一 (F)
                 if (offset > 0) {
                     const nodes = this.getSortedSelection();
@@ -98,8 +99,8 @@ app.registerExtension({
                 }
                 this.connectManyToOne({ offset: offset, cycleTargetSlots: offset > 0 });
                 break;
-                
-            case "SHIFT_KEY": 
+
+            case "SHIFT_KEY":
                 // 一对多 (Shift+F)
                 if (offset > 0) {
                     const nodes = this.getSortedSelectionStrict();
@@ -112,7 +113,7 @@ app.registerExtension({
                 this.connectOneToMany({ offset: offset, cycleSourceSlots: offset > 0 });
                 break;
 
-            case "CTRL_KEY": 
+            case "CTRL_KEY":
                 // 强制多对一 (Ctrl+F)
                 if (offset > 0) {
                     const nodes = this.getSortedSelection();
@@ -125,7 +126,7 @@ app.registerExtension({
                 this.connectManyToOne({ offset: offset, force: true, cycleSourceNodes: offset > 0 });
                 break;
 
-            case "CTRL_SHIFT_KEY": 
+            case "CTRL_SHIFT_KEY":
                 // 强制一对多 (Ctrl+Shift+F)
                 if (offset > 0) {
                     const nodes = this.getSortedSelectionStrict();
@@ -138,7 +139,7 @@ app.registerExtension({
                 this.connectOneToMany({ offset: offset, force: true, cycleTargetNodes: offset > 0 });
                 break;
 
-            case "ALT_KEY": 
+            case "ALT_KEY":
                 this.connectDaisyChain();
                 break;
 
@@ -160,9 +161,9 @@ app.registerExtension({
 
     disconnectLinksBetween(sources, targets) {
         if (!sources.length || !targets.length) return;
-        
+
         const graph = app.canvas.graph;
-        
+
         const sourceIds = new Set(sources.map(n => n.id));
         let changed = false;
 
@@ -212,11 +213,11 @@ app.registerExtension({
                     }
                 }
             }
-        } 
+        }
         // 多选模式：仅断开选中节点内部的连接
         else {
             const selectedNodeIds = new Set(selectedNodes.map(n => n.id));
-            
+
             for (const node of selectedNodes) {
                 if (!node.inputs) continue;
                 for (let i = 0; i < node.inputs.length; i++) {
@@ -268,19 +269,19 @@ app.registerExtension({
     connectSourcesToTarget(sources, targetNode, options = {}) {
         if (!targetNode.inputs) return false;
 
-        const { 
-            force = false, 
-            offset = 0, 
-            cycleTargetSlots = false, 
+        const {
+            force = false,
+            offset = 0,
+            cycleTargetSlots = false,
             cycleSourceSlots = false,
-            sharedUsedOutputs = null 
+            sharedUsedOutputs = null
         } = options;
 
         let connectionMade = false;
-        
+
         // 如果外部没有传，则使用局部的 Set
-        const usedSourceOutputs = sharedUsedOutputs || new Set(); 
-        
+        const usedSourceOutputs = sharedUsedOutputs || new Set();
+
         const inputCount = targetNode.inputs.length;
         const matchStrategy = getSetting("FastLink.MatchStrategy", "name_type");
 
@@ -289,7 +290,7 @@ app.registerExtension({
         for (let k = 0; k < inputCount; k++) {
             const i = cycleTargetSlots ? (k + offset) % inputCount : k;
             const input = targetNode.inputs[i];
-            
+
             if (input.link && !force) continue;
 
             let bestMatch = null;
@@ -302,7 +303,7 @@ app.registerExtension({
                 for (let m = 0; m < outputCount; m++) {
                     const j = cycleSourceSlots ? (m + offset) % outputCount : m;
                     const output = sourceNode.outputs[j];
-                    
+
                     const outputId = `${sourceNode.id}_${j}`;
 
                     // 1. 如果不是轮询模式，我们需要检查端口占用
@@ -326,7 +327,7 @@ app.registerExtension({
                     const outputType = output.type;
                     const isInputWildcard = inputType === "*" || inputType === "REROUTE";
                     const isOutputWildcard = outputType === "*" || outputType === "REROUTE";
-                    
+
                     // 【修复】增强兼容性判定：如果类型完全相等或包含通配符，或列表类型存在交集
                     let isCompatible = (inputType === outputType) || isInputWildcard || isOutputWildcard;
 
@@ -362,7 +363,7 @@ app.registerExtension({
                     // 奖励机制：未被占用的端口获得高额奖励
                     if (sharedUsedOutputs && usedSourceOutputs.has(outputId)) {
                         // 已被占用：不加奖励分 (保持基础分 1~3，大于初始值 -1，所以能被选中)
-                        // currentScore += 0; 
+                        // currentScore += 0;
                     } else {
                          // 未被占用：给予高额奖励 (基础分 + 10 = 11~13)
                          currentScore += 10;
@@ -391,8 +392,8 @@ app.registerExtension({
         const nodes = this.getSortedSelection();
         if (nodes.length < 2) return;
 
-        const targetNode = nodes.pop(); 
-        let sourceNodes = nodes;        
+        const targetNode = nodes.pop();
+        let sourceNodes = nodes;
 
         if (options.cycleSourceNodes) {
             const idx = options.offset % sourceNodes.length;
@@ -408,14 +409,14 @@ app.registerExtension({
         const nodes = this.getSortedSelectionStrict();
         if (nodes.length < 2) return;
 
-        const sourceNode = nodes.shift(); 
-        let targetNodes = nodes;          
+        const sourceNode = nodes.shift();
+        let targetNodes = nodes;
 
         if (options.cycleTargetNodes) {
             const idx = options.offset % targetNodes.length;
             targetNodes = [targetNodes[idx]];
         }
-        
+
         // 共享 Set：用于在多个目标节点之间协调端口占用情况
         const batchUsedSourceOutputs = new Set();
         const sharedOptions = { ...options, sharedUsedOutputs: batchUsedSourceOutputs };
@@ -442,7 +443,7 @@ app.registerExtension({
             if (this.connectSourcesToTarget([currentSource], target, { force: false })) {
                 currentSource = target;
                 changed = true;
-            } 
+            }
         }
 
         if (changed) app.canvas.graph.setDirtyCanvas(true, true);

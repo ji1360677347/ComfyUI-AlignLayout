@@ -1,10 +1,10 @@
-import { app } from "../../scripts/app.js";
-import { api } from "../../scripts/api.js";
+import { app } from "../../../scripts/app.js";
+import { isEditing } from "../runtime.js";
+import { api } from "../../../scripts/api.js";
 
 // 注入自定义 CSS 样式
 // 使用 CSS 变量来支持动态颜色设置
-const style = document.createElement("style");
-style.textContent = `
+const menuStyle = `
     /* 全屏透明遮罩 */
     .add-node-menu-overlay {
         position: fixed;
@@ -13,7 +13,7 @@ style.textContent = `
         width: 100vw;
         height: 100vh;
         z-index: 9998;
-        background: transparent; 
+        background: transparent;
     }
 
     /* 菜单容器 */
@@ -27,30 +27,30 @@ style.textContent = `
         font-family: sans-serif;
         font-size: 12.5px; /* 默认值，会被JS覆盖 */
         z-index: 9999;
-        min-width: 160px; 
-        width: max-content; 
+        min-width: 160px;
+        width: max-content;
         max-width: 400px; /* 默认值，会被JS覆盖 */
         padding: 4px 0;
         user-select: none;
         backdrop-filter: var(--anm-blur, blur(8px)); /* 动态毛玻璃 */
-        opacity: 0; 
+        opacity: 0;
         transition: opacity 0.05s ease-in;
     }
-    
+
     .add-node-menu-container.visible {
         opacity: 1;
     }
 
     /* 菜单项基础样式 */
     .add-node-menu-item {
-        padding: 6px 12px; 
+        padding: 6px 12px;
         cursor: pointer;
         display: flex;
         justify-content: space-between;
         align-items: center;
-        transition: background 0.1s; 
+        transition: background 0.1s;
         position: relative;
-        border-left: 3px solid transparent; 
+        border-left: 3px solid transparent;
     }
 
     /* 悬停状态 - 动态颜色 */
@@ -61,7 +61,7 @@ style.textContent = `
 
     /* 置顶状态 (背景加深) */
     .add-node-menu-item.pinned {
-        background-color: rgba(0, 0, 0, 0.4); 
+        background-color: rgba(0, 0, 0, 0.4);
     }
     .add-node-menu-item.pinned:hover, .add-node-menu-item.pinned.active {
         background: var(--anm-hover-bg, #2a60a8);
@@ -69,8 +69,8 @@ style.textContent = `
 
     /* Quick 标记状态 - 动态颜色 */
     .add-node-menu-item.quick-marked {
-        border-left: 3px solid var(--anm-mark-color, #2ecc71); 
-        background-color: var(--anm-mark-bg, rgba(46, 204, 113, 0.05)); 
+        border-left: 3px solid var(--anm-mark-color, #2ecc71);
+        background-color: var(--anm-mark-bg, rgba(46, 204, 113, 0.05));
     }
 
     /* 箭头 */
@@ -83,15 +83,15 @@ style.textContent = `
     /* 分割线 */
     .add-node-menu-separator {
         height: 1px;
-        background-color: rgba(255, 255, 255, 0.15); 
-        margin: 4px 0; 
+        background-color: rgba(255, 255, 255, 0.15);
+        margin: 4px 0;
         width: 100%;
-        transform: scaleY(0.5); 
+        transform: scaleY(0.5);
     }
-    
+
     /* 拖拽指示器 - 顶部边缘 */
     .add-node-menu-container.drag-over-header {
-        border-top: 2px solid #4a90e2; 
+        border-top: 2px solid #4a90e2;
     }
 
     /* 拖拽相关样式 */
@@ -107,7 +107,7 @@ style.textContent = `
     }
     .add-node-menu-item.drag-over-unpin {
         opacity: 0.7;
-        background: rgba(200, 50, 50, 0.2); 
+        background: rgba(200, 50, 50, 0.2);
     }
 
     /* 右键菜单 */
@@ -136,29 +136,33 @@ style.textContent = `
         color: white;
     }
 `;
-document.head.appendChild(style);
 
-app.registerExtension({
-    name: "Comfy.AddNodeMenu", 
-    
+export const createAddNodeMenu = (scope) => ({
+    name: "Comfy.AddNodeMenu",
+
     setup() {
+        const style = document.createElement("style");
+        style.textContent = menuStyle;
+        document.head.appendChild(style);
+        scope.add(() => style.remove());
+        let menuRequest = 0;
         // --- 核心变量 ---
-        let menuStack = []; 
+        let menuStack = [];
         let overlay = null;
-        let contextMenuEl = null; 
-        let hoverTimer = null; 
+        let contextMenuEl = null;
+        let hoverTimer = null;
         let globalMouse = { x: 0, y: 0 };
         let lockedCanvasPos = { x: 0, y: 0 };
-        
-        let dragSource = null; 
-        
+
+        let dragSource = null;
+
         // --- 缓存数据 ---
         let cachedData = {
-            pins: {},      
+            pins: {},
             quick: [], // 原 favorites 改为 quick
             last_category: null
         };
-        
+
         const UNCATEGORIZED_NAME = "Others";
         // 特殊键：用于存储所有被置顶的“节点”的类名 (Class Name)
         const GLOBAL_NODE_PINS_KEY = "__ALL_NODES__";
@@ -170,7 +174,7 @@ app.registerExtension({
             "image", "图像", "api node", "工具", "api", "api 节点", "API"
         ];
 
-        window.addEventListener("mousemove", (e) => {
+        scope.listen(window, "mousemove", (e) => {
             globalMouse.x = e.clientX;
             globalMouse.y = e.clientY;
         });
@@ -189,8 +193,8 @@ app.registerExtension({
                         cachedData.pins[GLOBAL_NODE_PINS_KEY] = [];
                     }
                 }
-            } catch (e) { 
-                console.error("[AddNodeMenu] Load failed", e); 
+            } catch (e) {
+                console.error("[AddNodeMenu] Load failed", e);
             }
         }
 
@@ -201,20 +205,20 @@ app.registerExtension({
                     body: JSON.stringify(pinsData),
                     headers: { "Content-Type": "application/json" }
                 });
-            } catch (e) { 
-                console.error("Save pins failed", e); 
+            } catch (e) {
+                console.error("Save pins failed", e);
             }
         }
 
-        async function saveQuick(quickData) { 
+        async function saveQuick(quickData) {
             try {
                 await api.fetchApi("/align-layout/quick", {
                     method: "POST",
                     body: JSON.stringify(quickData),
                     headers: { "Content-Type": "application/json" }
                 });
-            } catch (e) { 
-                console.error("Save quick failed", e); 
+            } catch (e) {
+                console.error("Save quick failed", e);
             }
         }
 
@@ -225,8 +229,8 @@ app.registerExtension({
                     body: JSON.stringify(categoryData),
                     headers: { "Content-Type": "application/json" }
                 });
-            } catch (e) { 
-                console.error("Save last category failed", e); 
+            } catch (e) {
+                console.error("Save last category failed", e);
             }
         }
 
@@ -268,17 +272,17 @@ app.registerExtension({
             let key = parts.pop();
             if (key === "space") key = " ";
             if (e.key.toLowerCase() !== key) return false;
-            
+
             const ctrl = parts.includes("ctrl");
             const alt = parts.includes("alt");
             const shift = parts.includes("shift");
             const meta = parts.includes("meta") || parts.includes("cmd");
-            
+
             if (e.ctrlKey !== ctrl) return false;
             if (e.altKey !== alt) return false;
             if (e.shiftKey !== shift) return false;
             if (e.metaKey !== meta) return false;
-            
+
             return true;
         }
 
@@ -326,7 +330,7 @@ app.registerExtension({
                 const list = cachedData.pins[parentPath];
                 const idx = list.indexOf(key);
                 if (idx === -1) {
-                    list.push(key); 
+                    list.push(key);
                 } else {
                     list.splice(idx, 1);
                 }
@@ -375,15 +379,15 @@ app.registerExtension({
                 savePins(cachedData.pins);
             }
         }
-        
+
         function isQuick(quickObj) {
             if (!cachedData.quick) return false;
             return cachedData.quick.some(f => {
                 if (f.isCategory && quickObj.isCategory) {
-                    return f.category === quickObj.category; 
+                    return f.category === quickObj.category;
                 }
                 if (!f.isCategory && !quickObj.isCategory) {
-                    return f.type === quickObj.type; 
+                    return f.type === quickObj.type;
                 }
                 return false;
             });
@@ -395,14 +399,14 @@ app.registerExtension({
             if (!exists) {
                 cachedData.quick.push({
                     type: quickObj.type,
-                    category: quickObj.category, 
+                    category: quickObj.category,
                     isCategory: quickObj.isCategory,
                     timestamp: Date.now()
                 });
                 saveQuick(cachedData.quick);
             }
         }
-        
+
         function removeQuick(quickObj) {
              if (!cachedData.quick) return;
              const idx = cachedData.quick.findIndex(f => {
@@ -450,7 +454,7 @@ app.registerExtension({
                 }
 
                 const parts = category.split('/');
-                
+
                 let currentLevel = tree;
                 for (const part of parts) {
                     if (!currentLevel[part]) {
@@ -458,18 +462,20 @@ app.registerExtension({
                     }
                     currentLevel = currentLevel[part]._children;
                 }
-                
-                currentLevel[displayName] = { 
-                    _isCategory: false, 
-                    type: className, 
+
+                currentLevel[displayName] = {
+                    _isCategory: false,
+                    type: className,
                     title: displayName,
-                    category: category 
+                    category: category
                 };
             }
             return tree;
         }
 
         function closeAll() {
+            menuRequest++;
+            clearTimeout(hoverTimer);
             menuStack.forEach(el => el.remove());
             menuStack = [];
             closeContextMenu();
@@ -478,6 +484,8 @@ app.registerExtension({
                 overlay = null;
             }
         }
+
+        scope.add(closeAll);
 
         function closeContextMenu() {
             if (contextMenuEl) {
@@ -501,9 +509,9 @@ app.registerExtension({
                 e.stopPropagation();
 
                 const currentTop = parseFloat(container.style.top) || 0;
-                const delta = e.deltaY; 
+                const delta = e.deltaY;
                 let newTop = currentTop - delta;
-                const maxTop = viewportHeight - 50; 
+                const maxTop = viewportHeight - 50;
                 const minTop = 50 - rect.height;
 
                 if (newTop > maxTop) newTop = maxTop;
@@ -513,8 +521,8 @@ app.registerExtension({
                 const levelIndex = menuStack.indexOf(container);
                 if (levelIndex !== -1) {
                     closeLevelsAfter(levelIndex);
-                    closeContextMenu(); 
-                    const items = container.querySelectorAll('.add-node-menu-item'); 
+                    closeContextMenu();
+                    const items = container.querySelectorAll('.add-node-menu-item');
                     items.forEach(i => i.classList.remove('active'));
                 }
             }, { passive: false });
@@ -531,11 +539,11 @@ app.registerExtension({
 
             const pinned = [];
             const unpinned = [];
-            
+
             keys.forEach(k => {
                 const item = structure[k];
                 let isP = false;
-                
+
                 if (item && !item._isCategory && item.type) {
                     if (globalNodePins.includes(item.type)) isP = true;
                 } else {
@@ -544,11 +552,11 @@ app.registerExtension({
                 if (isP) pinned.push(k);
                 else unpinned.push(k);
             });
-            
+
             pinned.sort((a, b) => {
                 const itemA = structure[a];
                 const itemB = structure[b];
-                
+
                 let scoreA = 999999;
                 let scoreB = 999999;
 
@@ -592,27 +600,27 @@ app.registerExtension({
             closeContextMenu();
 
             const menu = document.createElement("div");
-            menu.className = "add-node-menu-context"; 
-            
+            menu.className = "add-node-menu-context";
+
             const isCategory = itemData._isCategory;
-            const type = itemData.type; 
-            
+            const type = itemData.type;
+
             const pinned = isPinned(parentPath, key, isCategory, type);
             const isMarked = isQuick(quickObj);
-            
+
             const pinItem = document.createElement("div");
-            pinItem.className = "add-node-menu-context-item"; 
+            pinItem.className = "add-node-menu-context-item";
             pinItem.innerHTML = pinned ? "取消置顶 (Unpin)" : "置顶 (Pin)";
             pinItem.onclick = (ev) => {
                 ev.stopPropagation();
                 togglePin(parentPath, key, isCategory, type);
-                closeContextMenu(); 
-                refreshMenu(container); 
+                closeContextMenu();
+                refreshMenu(container);
             };
             menu.appendChild(pinItem);
 
             const quickItem = document.createElement("div");
-            quickItem.className = "add-node-menu-context-item"; 
+            quickItem.className = "add-node-menu-context-item";
             quickItem.innerHTML = isMarked ? "取消收藏 (Unfavorite)" : "收藏 (Favorite)";
             quickItem.onclick = (ev) => {
                 ev.stopPropagation();
@@ -621,8 +629,8 @@ app.registerExtension({
                 } else {
                     addQuick(quickObj);
                 }
-                closeContextMenu(); 
-                refreshMenu(container); 
+                closeContextMenu();
+                refreshMenu(container);
             };
             menu.appendChild(quickItem);
 
@@ -639,7 +647,7 @@ app.registerExtension({
         }
 
         function renderMenuContent(container, structure, levelIndex, parentPath) {
-            container.innerHTML = ''; 
+            container.innerHTML = '';
 
             let allKeys = Object.keys(structure);
             let finalKeys = [];
@@ -688,7 +696,7 @@ app.registerExtension({
                 if (dragSource && dragSource.parentPath === parentPath && !dragSource.isPinned && pinnedCount === 0) {
                     e.preventDefault();
                     const rect = container.getBoundingClientRect();
-                    if (e.clientY - rect.top < 30) { 
+                    if (e.clientY - rect.top < 30) {
                         container.classList.add('drag-over-header');
                     } else {
                         container.classList.remove('drag-over-header');
@@ -705,8 +713,8 @@ app.registerExtension({
                      const rect = container.getBoundingClientRect();
                      if (e.clientY - rect.top < 30) {
                          e.preventDefault();
-                         updatePinOrder(parentPath, dragSource.key, dragSource.isCategory, dragSource.type, 0); 
-                         refreshMenu(container); 
+                         updatePinOrder(parentPath, dragSource.key, dragSource.isCategory, dragSource.type, 0);
+                         refreshMenu(container);
                      }
                 }
                  container.classList.remove('drag-over-header');
@@ -715,7 +723,7 @@ app.registerExtension({
             finalKeys.forEach((key, index) => {
                 if (key === "---SEPARATOR---") {
                     const sep = document.createElement("div");
-                    sep.className = "add-node-menu-separator"; 
+                    sep.className = "add-node-menu-separator";
                     sep.dataset.isSeparator = "true";
                     sep.ondragover = (e) => {
                          e.preventDefault();
@@ -727,16 +735,16 @@ app.registerExtension({
                     sep.ondragleave = (e) => {
                          sep.style.background = "";
                          sep.style.height = "";
-                         sep.classList.remove('drag-over-top'); 
+                         sep.classList.remove('drag-over-top');
                          sep.style.backgroundColor = "rgba(255, 255, 255, 0.15)";
                          sep.style.transform = "scaleY(0.5)";
                     };
                     sep.ondrop = (e) => {
                         e.preventDefault();
                         if (dragSource && dragSource.parentPath === parentPath) {
-                             const targetIndex = pinnedCount; 
+                             const targetIndex = pinnedCount;
                              updatePinOrder(parentPath, dragSource.key, dragSource.isCategory, dragSource.type, targetIndex);
-                             refreshMenu(container); 
+                             refreshMenu(container);
                         }
                     };
                     container.appendChild(sep);
@@ -747,24 +755,24 @@ app.registerExtension({
 
                 const itemData = structure[key];
                 const itemDiv = document.createElement("div");
-                itemDiv.className = "add-node-menu-item"; 
-                
+                itemDiv.className = "add-node-menu-item";
+
                 const quickObj = itemData._isCategory
                     ? { title: key, type: "CATEGORY", isCategory: true, category: (parentPath === "root" ? key : parentPath + "/" + key) }
                     : { title: itemData.title, type: itemData.type, isCategory: false, category: itemData.category };
-                
+
                 const isItemPinned = isPinned(parentPath, key, itemData._isCategory, itemData.type);
-                const isItemMarked = isQuick(quickObj); 
+                const isItemMarked = isQuick(quickObj);
 
                 if (isItemPinned) itemDiv.classList.add("pinned");
-                if (isItemMarked) itemDiv.classList.add("quick-marked"); 
+                if (isItemMarked) itemDiv.classList.add("quick-marked");
 
-                if (levelIndex === 0) itemDiv.dataset.key = key; 
+                if (levelIndex === 0) itemDiv.dataset.key = key;
 
                 const contentWrapper = document.createElement("div");
                 contentWrapper.style.display = "flex";
                 contentWrapper.style.alignItems = "center";
-                
+
                 const textSpan = document.createElement("span");
                 textSpan.textContent = key;
                 contentWrapper.appendChild(textSpan);
@@ -772,7 +780,7 @@ app.registerExtension({
 
                 if (itemData._isCategory) {
                     const arrow = document.createElement("span");
-                    arrow.className = "add-node-menu-arrow"; 
+                    arrow.className = "add-node-menu-arrow";
                     arrow.textContent = "▶";
                     itemDiv.appendChild(arrow);
                 }
@@ -789,8 +797,8 @@ app.registerExtension({
                     }
 
                     dragSource = {
-                        key: key, 
-                        type: itemData.type, 
+                        key: key,
+                        type: itemData.type,
                         isCategory: itemData._isCategory,
                         parentPath: parentPath,
                         isPinned: isItemPinned,
@@ -798,7 +806,7 @@ app.registerExtension({
                     };
                     itemDiv.classList.add("dragging");
                     e.dataTransfer.effectAllowed = "move";
-                    e.dataTransfer.setData("text/plain", key); 
+                    e.dataTransfer.setData("text/plain", key);
                 };
 
                 itemDiv.ondragend = (e) => {
@@ -808,7 +816,7 @@ app.registerExtension({
 
                 itemDiv.ondragover = (e) => {
                     if (!dragSource || dragSource.parentPath !== parentPath) return;
-                    e.preventDefault(); 
+                    e.preventDefault();
                     const rect = itemDiv.getBoundingClientRect();
                     const offsetY = e.clientY - rect.top;
                     const isTopHalf = offsetY < rect.height / 2;
@@ -828,7 +836,7 @@ app.registerExtension({
                 itemDiv.ondrop = (e) => {
                     if (!dragSource || dragSource.parentPath !== parentPath) return;
                     e.preventDefault();
-                    
+
                     const rect = itemDiv.getBoundingClientRect();
                     const offsetY = e.clientY - rect.top;
                     const isTopHalf = offsetY < rect.height / 2;
@@ -840,14 +848,14 @@ app.registerExtension({
                         } else {
                             targetPinIndex = getLocalPinnedList(parentPath).indexOf(key);
                         }
-                        if (!isTopHalf) targetPinIndex += 1; 
+                        if (!isTopHalf) targetPinIndex += 1;
                         updatePinOrder(parentPath, dragSource.key, dragSource.isCategory, dragSource.type, targetPinIndex);
-                        refreshMenu(container); 
+                        refreshMenu(container);
                     } else {
                         if (dragSource.isPinned) {
                             removePin(parentPath, dragSource.key, dragSource.isCategory, dragSource.type);
-                            refreshMenu(container); 
-                        } 
+                            refreshMenu(container);
+                        }
                     }
                 };
 
@@ -855,26 +863,26 @@ app.registerExtension({
                     const nextPath = parentPath === "root" ? key : (parentPath + "/" + key);
                     const activateSubmenu = () => {
                         if (levelIndex === 0) updateLastCategory(key);
-                        const siblings = container.querySelectorAll('.add-node-menu-item'); 
+                        const siblings = container.querySelectorAll('.add-node-menu-item');
                         siblings.forEach(s => s.classList.remove('active'));
                         itemDiv.classList.add('active');
-                        
+
                         if (hoverTimer) clearTimeout(hoverTimer);
                         const delay = app.ui.settings.getSettingValue("AddNodeMenu.HoverDelay", 40);
-                        
-                        hoverTimer = setTimeout(() => {
-                            closeLevelsAfter(levelIndex); 
+
+                        hoverTimer = scope.timeout(() => {
+                            closeLevelsAfter(levelIndex);
                             closeContextMenu();
                             const rect = itemDiv.getBoundingClientRect();
-                            let subX = rect.right - 1; 
+                            let subX = rect.right - 1;
                             let subY = rect.top;
                             const subMenuEl = showMenu(itemData._children, subX, subY, levelIndex + 1, nextPath);
-                            subMenuEl.classList.add('visible'); 
+                            subMenuEl.classList.add('visible');
                             const subRect = subMenuEl.getBoundingClientRect();
                             if (subRect.right > window.innerWidth) subMenuEl.style.left = (rect.left - subRect.width + 1) + "px";
                             if (subRect.height > window.innerHeight) subMenuEl.style.top = "10px";
                             else if (subRect.bottom > window.innerHeight) subMenuEl.style.top = Math.max(0, window.innerHeight - subRect.height - 10) + "px";
-                        }, delay); 
+                        }, delay);
                     };
                     itemDiv.addEventListener("mouseenter", activateSubmenu);
                     itemDiv.addEventListener("click", (e) => { e.stopPropagation(); activateSubmenu(); });
@@ -884,12 +892,12 @@ app.registerExtension({
                         closeAll();
                     });
                     itemDiv.addEventListener("mouseenter", () => {
-                        const siblings = container.querySelectorAll('.add-node-menu-item'); 
+                        const siblings = container.querySelectorAll('.add-node-menu-item');
                         siblings.forEach(s => s.classList.remove('active'));
                         itemDiv.classList.add('active');
                         if (hoverTimer) clearTimeout(hoverTimer);
                         const delay = app.ui.settings.getSettingValue("AddNodeMenu.HoverDelay", 40);
-                        hoverTimer = setTimeout(() => { closeLevelsAfter(levelIndex); }, delay);
+                        hoverTimer = scope.timeout(() => { closeLevelsAfter(levelIndex); }, delay);
                     });
                 }
                 itemDiv.addEventListener("contextmenu", (e) => {
@@ -901,8 +909,8 @@ app.registerExtension({
 
         function showMenu(structure, x, y, levelIndex, parentPath = "root") {
             const container = document.createElement("div");
-            container.className = "add-node-menu-container"; 
-            
+            container.className = "add-node-menu-container";
+
             // --- 应用设置样式 ---
             const opacity = app.ui.settings.getSettingValue("AddNodeMenu.Opacity", 0.98);
             const fontSize = app.ui.settings.getSettingValue("AddNodeMenu.FontSize", 12.5);
@@ -920,7 +928,7 @@ app.registerExtension({
             container.style.background = `rgba(30, 30, 30, ${opacity})`;
             container.style.fontSize = `${fontSize}px`;
             container.style.maxWidth = `${maxWidth}px`;
-            
+
             // 设置 CSS 变量
             container.style.setProperty('--anm-blur', enableBlur ? 'blur(8px)' : 'none');
             container.style.setProperty('--anm-hover-bg', validHover);
@@ -935,7 +943,7 @@ app.registerExtension({
             container.style.top = `${y}px`;
             attachScrollHandler(container);
             document.body.appendChild(container);
-            
+
             if (menuStack.length > levelIndex) {
                 menuStack = menuStack.slice(0, levelIndex);
             }
@@ -955,7 +963,7 @@ app.registerExtension({
              }
         }
 
-        function initMenu() {
+        async function initMenu() {
             const enabled = app.ui.settings.getSettingValue("AddNodeMenu.Enabled", true);
             if (!enabled) return;
 
@@ -967,15 +975,16 @@ app.registerExtension({
                 lockedCanvasPos.y = app.canvas.graph_mouse[1];
             }
 
-            closeAll(); 
-            fetchData();
-
-            // 菜单UI显示位置 (屏幕坐标)
+            closeAll();
+            const request = menuRequest;
             const screenX = globalMouse.x;
             const screenY = globalMouse.y;
+            await fetchData();
+            if (!scope.active || request !== menuRequest) return;
 
+            // 菜单UI显示位置 (屏幕坐标)
             overlay = document.createElement("div");
-            overlay.className = "add-node-menu-overlay"; 
+            overlay.className = "add-node-menu-overlay";
             overlay.onclick = (e) => { e.stopPropagation(); e.preventDefault(); closeAll(); };
             overlay.addEventListener("mousedown", (e) => { closeAll(); });
             overlay.addEventListener("contextmenu", (e) => { e.preventDefault(); closeAll(); });
@@ -983,7 +992,7 @@ app.registerExtension({
 
             // 此时获取设置并过滤节点树
             const tree = buildNodeTree();
-            const rootMenu = showMenu(tree, 0, 0, 0, "root"); 
+            const rootMenu = showMenu(tree, 0, 0, 0, "root");
 
             const shouldRemember = app.ui.settings.getSettingValue("AddNodeMenu.RememberLast", true);
             const lastCategory = shouldRemember ? cachedData.last_category : null;
@@ -993,7 +1002,7 @@ app.registerExtension({
             const rect = rootMenu.getBoundingClientRect();
             let targetEl = null;
             if (lastCategory) {
-                targetEl = rootMenu.querySelector(`.add-node-menu-item[data-key="${lastCategory}"]`); 
+                targetEl = rootMenu.querySelector(`.add-node-menu-item[data-key="${lastCategory}"]`);
             }
 
             if (targetEl) {
@@ -1017,7 +1026,7 @@ app.registerExtension({
                 if (finalTop < 10) finalTop = 10;
                 if (finalTop + rect.height > window.innerHeight - 10) {
                     finalTop = window.innerHeight - rect.height - 10;
-                    if (finalTop < 10) finalTop = 10; 
+                    if (finalTop < 10) finalTop = 10;
                 }
             }
             rootMenu.style.top = `${finalTop}px`;
@@ -1026,17 +1035,17 @@ app.registerExtension({
         }
 
         fetchData();
-        
-        // --- 修改：暴露全局变量 ---
-        window.alignLayout_openAddNodeMenu = initMenu;
 
-        window.addEventListener("keydown", function(e) {
+        // --- 修改：暴露全局变量 ---
+        scope.expose("alignLayout_openAddNodeMenu", initMenu);
+
+        scope.listen(window, "keydown", function(e) {
             const shortcutSetting = app.ui.settings.getSettingValue("AddNodeMenu.Shortcut", "A");
-            
+
             if (matchShortcut(e, shortcutSetting)) {
                 const target = e.target;
-                if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return;
-                
+                if (isEditing(target)) return;
+
                 const quickOverlay = document.querySelector(".quick-menu-overlay");
                 if (quickOverlay) {
                     quickOverlay.click();

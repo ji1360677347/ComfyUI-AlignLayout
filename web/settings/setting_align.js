@@ -1,4 +1,4 @@
-import { app } from "../../scripts/app.js";
+import { app } from "../../../scripts/app.js";
 
 // =========================================================
 // 插件: NodeAligner (节点对齐助手) 设置

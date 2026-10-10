@@ -1,14 +1,15 @@
-import { app } from "../../scripts/app.js";
+import { app } from "../../../scripts/app.js";
+import { isEditing } from "../runtime.js";
 
 /**
  * 插件: 选择相同节点 - 逻辑模块
  * 负责监听快捷键并执行节点选择操作
  */
-app.registerExtension({
+export const createSelectSame = (scope) => ({
     name: "Comfy.AlignLayout.SelectSame.Logic",
     async setup() {
         // 监听全局键盘事件
-        window.addEventListener("keydown", (e) => {
+        scope.listen(window, "keydown", (e) => {
             // 从设置面板读取实时配置
             const isEnabled = app.ui.settings.getSettingValue("AlignLayout.SelectSame.Enabled", true);
             const shortcutSetting = app.ui.settings.getSettingValue("AlignLayout.SelectSame.Shortcut", "Shift+A");
@@ -16,7 +17,7 @@ app.registerExtension({
             if (!isEnabled) return;
 
             // 过滤输入框，避免打字冲突
-            if (["INPUT", "TEXTAREA"].includes(e.target.tagName)) return;
+            if (isEditing(e.target)) return;
 
             // 匹配快捷键
             if (matchShortcut(e, shortcutSetting)) {
@@ -32,12 +33,12 @@ app.registerExtension({
         function matchShortcut(event, shortcutStr) {
             if (!shortcutStr) return false;
             const parts = shortcutStr.split("+").map(s => s.trim().toLowerCase());
-            
+
             const hasCtrl = parts.includes("ctrl");
             const hasShift = parts.includes("shift");
             const hasAlt = parts.includes("alt");
             const hasMeta = parts.includes("meta") || parts.includes("command");
-            
+
             // 提取主按键 (例如 'a' 或 's')
             const keyPart = parts.filter(p => !["ctrl", "shift", "alt", "meta", "command"].includes(p))[0];
             if (!keyPart) return false;
@@ -59,7 +60,7 @@ app.registerExtension({
             // [修复] 关键修改：使用 app.canvas.graph 而不是 app.graph
             // app.canvas.graph 始终指向当前正在编辑的图层（主工作流或子图）
             const graph = app.canvas.graph;
-            
+
             // 获取用户当前选中的节点实例
             const selectedNodes = Object.values(canvas.selected_nodes);
             if (selectedNodes.length === 0) return;

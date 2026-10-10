@@ -1,14 +1,14 @@
-import { app } from "../../scripts/app.js";
+import { app } from "../../../scripts/app.js";
+import { isEditing } from "../runtime.js";
 
-app.registerExtension({
+export const createAutoLayout = (scope) => ({
     name: "Comfy.AutoLayout.Auto",
     async setup() {
         // 暴露实例给外部调用
-        window.__comfy_auto_layout_instance = this;
+        scope.expose("__comfy_auto_layout_instance", this);
 
-        window.addEventListener("keydown", (e) => {
-            const activeTag = document.activeElement.tagName;
-            if (activeTag === "INPUT" || activeTag === "TEXTAREA") return;
+        scope.listen(window, "keydown", (e) => {
+            if (isEditing(e.target)) return;
 
             // 检查总开关
             const isEnabled = app.extensionManager.setting.get("AutoLayout.Enabled") ?? true;
@@ -27,17 +27,14 @@ app.registerExtension({
             const metaRequired = modifiers.includes("META") || modifiers.includes("CMD");
 
             if (e.key.toUpperCase() === key) {
-                if (altRequired && !e.altKey) return;
-                if (ctrlRequired && !e.ctrlKey) return;
-                if (shiftRequired && !e.shiftKey) return;
-                if (metaRequired && !e.metaKey) return;
+                if (e.altKey !== altRequired || e.ctrlKey !== ctrlRequired ||
+                    e.shiftKey !== shiftRequired || e.metaKey !== metaRequired) return;
 
                 e.preventDefault();
                 e.stopPropagation();
                 this.arrangeNodes();
             }
         });
-        console.log("AutoLayout: Module Loaded with Native Hierarchy & Safe Bounding Box.");
     },
 
     /**
@@ -54,6 +51,7 @@ app.registerExtension({
     arrangeNodes() {
         const graph = app.canvas.graph;
         const selectedNodesMap = app.canvas.selected_nodes;
+        const selectedGroups = getSelectedGroups(app.canvas);
         let targetNodes = [];
 
         // 读取所有配置
@@ -66,7 +64,7 @@ app.registerExtension({
         const isReverse = layoutDir.includes("Right-to-Left");
 
         // 判断是否是“全局模式”：没有选中任何节点，且没有明确选中任何原生节点组
-        const isWholeGraph = (!selectedNodesMap || Object.keys(selectedNodesMap).length === 0) && !app.canvas.selected_group;
+        const isWholeGraph = (!selectedNodesMap || Object.keys(selectedNodesMap).length === 0) && selectedGroups.length === 0;
 
         if (!isWholeGraph) {
             targetNodes = Object.values(selectedNodesMap || {});
@@ -74,8 +72,10 @@ app.registerExtension({
             targetNodes = graph._nodes;
         }
 
-        if ((!targetNodes || targetNodes.length === 0) && !app.canvas.selected_group) return;
+        if ((!targetNodes || targetNodes.length === 0) && selectedGroups.length === 0) return;
 
+        graph.beforeChange();
+        try {
         // =========================================================
         // 【第一步】调用官方原生状态刷新
         // 确保所有组内的节点层级关系是最新的
@@ -92,16 +92,14 @@ app.registerExtension({
         // =========================================================
         let expandedNodes = new Set(targetNodes);
         let relevantGroups = new Set();
-        
+
         if (isWholeGraph) {
             // 全局模式：纳入所有组
             allGroups.forEach(g => relevantGroups.add(g));
         } else {
             // 局部模式：检测用户是否明确选中了原生节点组 (LiteGraph 的 selected_group)
-            if (app.canvas.selected_group) {
-                relevantGroups.add(app.canvas.selected_group);
-            }
-            
+            selectedGroups.forEach(group => relevantGroups.add(group));
+
             // ✨ 新增智能感知框选：如果用户框选了某个组内的【所有节点】，智能推断用户意图为选中该组
             allGroups.forEach(g => {
                 const groupNodes = g.nodes || [];
@@ -147,7 +145,7 @@ app.registerExtension({
             const childrenItems = g.children ? Array.from(g.children) : (g.nodes || []);
             childrenItems.forEach(child => {
                 if (entities.includes(child) && child !== g) {
-                    parentMap.set(child, g); 
+                    parentMap.set(child, g);
                 }
             });
         });
@@ -171,7 +169,8 @@ app.registerExtension({
                     isGroup: false,
                     node: entity,
                     pos: [...entity.pos],
-                    size: [...entity.size],
+                    size: [...entity.renderingSize],
+                    titleHeight: LiteGraph.NODE_TITLE_HEIGHT,
                     entity: entity
                 };
             }
@@ -181,10 +180,11 @@ app.registerExtension({
 
             if (childBlocks.length > 0) {
                 // ✨ 修复 1：向左偏移问题。逆向模式下，子节点的起跑线必须是组的右边缘！
-                const childStartX = isReverse ? (entity.pos[0] + entity.size[0]) : entity.pos[0];
-                
+                const childStartX = isReverse ? entity.pos[0] + entity.size[0] - 10 : entity.pos[0] + 10;
+                const childStartY = entity.pos[1] + (entity.titleHeight || 30) + 10;
+
                 // 将内部子集排版，排版后内部节点的坐标已经改变
-                _this.layoutBlocks(childBlocks, graph, childStartX, entity.pos[1], horizontalGap, rowHeightGap, isReverse, gravity, islandDir, islandGap);
+                _this.layoutBlocks(childBlocks, graph, childStartX, childStartY, horizontalGap, rowHeightGap, isReverse, gravity, islandDir, islandGap);
 
                 // =========================================================
                 // ✨ 核心修复：防止空间脱节、"几何绑架"及标题重叠
@@ -194,8 +194,8 @@ app.registerExtension({
                     // ✨ 修复 3：补全 LiteGraph 坐标系盲区
                     // 普通节点的主体在 pos[1]，但其标题栏是在 pos[1] 的上方，因此要向上额外延伸 titleHeight。
                     // 节点组(Group)的坐标已经是包含了标题栏的最外层边框，因此不需要延伸。
-                    const childTitleHeight = b.isGroup ? 0 : (b.entity.titleHeight || 30);
-                    
+                    const childTitleHeight = b.titleHeight;
+
                     minX = Math.min(minX, b.pos[0]);
                     minY = Math.min(minY, b.pos[1] - childTitleHeight);
                     maxX = Math.max(maxX, b.pos[0] + b.size[0]);
@@ -203,8 +203,8 @@ app.registerExtension({
                 });
 
                 const titleHeight = entity.titleHeight || 30; // 动态获取原生标题栏高度
-                const paddingSide = 10; 
-                
+                const paddingSide = 10;
+
                 // ✨ 修复 2：破除 Setter 陷阱与标题重叠问题！
                 // 必须重新赋值整个数组 [x, y]，以此触发 LiteGraph 更新底层的 _bounding！
                 // 因为上方的 minY 已经精准包住了子节点的标题栏，所以这里再往上推 titleHeight 和 padding 就绝对安全了
@@ -218,6 +218,7 @@ app.registerExtension({
             return {
                 id: "group_" + Math.random(),
                 isGroup: true,
+                titleHeight: 0,
                 group: entity,
                 pos: [...entity.pos],
                 size: [...entity.size],
@@ -232,7 +233,7 @@ app.registerExtension({
 
         if (topBlocks.length > 0) {
             let anchorX, anchorY;
-            const allMinY = Math.min(...topBlocks.map(b => b.pos[1]));
+            const allMinY = Math.min(...topBlocks.map(block => block.pos[1] - block.titleHeight));
             if (isReverse) {
                 const allMaxRight = Math.max(...topBlocks.map(b => b.pos[0] + b.size[0]));
                 anchorX = allMaxRight;
@@ -259,6 +260,9 @@ app.registerExtension({
 
         graph.change();
         graph.setDirtyCanvas(true, true);
+        } finally {
+            graph.afterChange();
+        }
     },
 
     /**
@@ -528,7 +532,7 @@ app.registerExtension({
                     if (count === 0) return { y: item._newPos ? item._newPos[1] : item.pos[1], slot: 0 };
                     return { y: minParentY, slot: sumSlot / count };
                 };
-                
+
                 const keyA = getSortKey(a);
                 const keyB = getSortKey(b);
 
@@ -562,14 +566,14 @@ app.registerExtension({
                 }
 
                 // ✨ 获取当前节点的标题栏高度（节点组的视觉顶部与主体对齐，高度为0）
-                const itemTitleHeight = item.isGroup ? 0 : (item.entity.titleHeight || 30);
-                
+                const itemTitleHeight = item.titleHeight;
+
                 // ✨ 为了保证标题栏不吃掉上一层的间距，当前节点主体的最小安全下放距离必须加上 titleHeight
                 const minYForBody = currentCursorY + itemTitleHeight;
 
                 // 判断是否跟目标对齐，且目标位置没有越过安全边界
                 const finalY = (targetY !== -1 && targetY >= minYForBody) ? targetY : minYForBody;
-                
+
                 // 将新坐标缓存在 Block 上，等待递归函数负责真正的写入和平移
                 item._newPos = [
                     isReverse ? (currentXBase - item.size[0]) : colLeftX,
@@ -581,7 +585,7 @@ app.registerExtension({
 
                 // ✨ 计算下一个安全“天际线”游标：当前节点底部 + 要求的垂直间距
                 currentCursorY = itemBottom + rowHeightGap;
-                
+
                 // ✨ 修复孤岛垂直间距累加问题：孤岛的最大高度只需要算到节点底部，不应包含末尾的垂直间距
                 if (itemBottom > maxGroupY) maxGroupY = itemBottom;
             });
@@ -596,3 +600,19 @@ app.registerExtension({
         };
     }
 });
+
+function getSelectedGroups(canvas) {
+    const groups = new Set();
+    function visit(group) {
+        if (groups.has(group)) return;
+        groups.add(group);
+        group.recomputeInsideNodes();
+        for (const child of group.children) {
+            if (canvas.graph._groups.includes(child)) visit(child);
+        }
+    }
+    for (const item of canvas.selectedItems) {
+        if (canvas.graph._groups.includes(item)) visit(item);
+    }
+    return [...groups];
+}

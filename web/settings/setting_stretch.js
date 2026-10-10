@@ -1,4 +1,4 @@
-import { app } from "../../scripts/app.js";
+import { app } from "../../../scripts/app.js";
 
 // =========================================================
 // 插件: NodeResizer (节点拉伸助手) 设置

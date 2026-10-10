@@ -1,4 +1,4 @@
-import { app } from "../../scripts/app.js";
+import { app } from "../../../scripts/app.js";
 
 // =========================================================
 // 插件: Add Node Menu (添加节点菜单) 设置

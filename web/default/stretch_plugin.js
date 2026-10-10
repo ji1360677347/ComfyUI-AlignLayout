@@ -1,7 +1,8 @@
-import { app } from "../../scripts/app.js";
+import { app } from "../../../scripts/app.js";
+import { isEditing } from "../runtime.js";
 
 // 注册扩展
-app.registerExtension({
+export const createResizer = (scope) => ({
     name: "Comfy.NodeResizer",
     async setup() {
         // --- 设置 ID 常量 ---
@@ -29,8 +30,8 @@ app.registerExtension({
         let isTrackingFlick = false;
 
         // 静态常量
-        const btnBg = "rgba(34, 34, 34, 0.6)"; 
-        const iconScale = 0.7; 
+        const btnBg = "rgba(34, 34, 34, 0.6)";
+        const iconScale = 0.7;
 
         // SVG 图标库
         const svgIcons = {
@@ -82,7 +83,7 @@ app.registerExtension({
         pointerWrapper.style.cssText = "position:absolute; width:100%; height:100%; transition:transform 0.05s linear; opacity: 0.3;";
         const triangle = document.createElement("div");
         triangle.style.cssText = `position:absolute; top:-10px; left:50%; transform:translateX(-50%); width:0; height:0; border-left:6px solid transparent; border-right:6px solid transparent; border-bottom:10px solid #c2c2c2;`;
-        
+
         pointerWrapper.appendChild(triangle);
         indicatorContainer.appendChild(centralCircle);
         indicatorContainer.appendChild(pointerWrapper);
@@ -117,10 +118,10 @@ app.registerExtension({
                 const isSpecial = ["stretch_top", "stretch_bottom", "stretch_left", "stretch_right"].includes(action.cmd);
                 const w = isSpecial ? 63 : 54;
                 const h = isSpecial ? 42 : 36;
-                
+
                 const btn = createPillButton(action.icon, action.title, w, h);
                 const rad = (action.angle * Math.PI) / 180;
-                
+
                 // 中心定位计算
                 btn.style.left = `${250 + currentRadius * Math.cos(rad) - (w / 2)}px`;
                 btn.style.top = `${200 + currentRadius * Math.sin(rad) - (h / 2)}px`;
@@ -150,16 +151,18 @@ app.registerExtension({
             return btn;
         }
 
-        function closePanel() { 
-            panel.style.display = "none"; 
-            isTrackingFlick = false; 
+        function closePanel() {
+            panel.style.display = "none";
+            isTrackingFlick = false;
             window.__comfy_resizer_active = false;
         }
 
         // 挂载全局关闭函数供对齐插件调用
-        window.__comfy_resizer_close = closePanel;
+        scope.expose("__comfy_resizer_active", false);
+        scope.expose("__comfy_resizer_close", closePanel);
+        scope.add(() => { closePanel(); panel.remove(); });
 
-        window.addEventListener("mousemove", (e) => {
+        scope.listen(window, "mousemove", (e) => {
             // 检查功能是否启用
             const enabled = app.ui.settings.getSettingValue(SETTING_IDS.ENABLED, true);
             if (!enabled) return;
@@ -171,16 +174,16 @@ app.registerExtension({
                 const dist = Math.sqrt(dx * dx + dy * dy);
                 const angle = Math.atan2(dy, dx) * 180 / Math.PI;
                 pointerWrapper.style.transform = `rotate(${angle + 90}deg)`;
-                
+
                 // 获取当前的甩动阈值
                 const currentDistThreshold = app.ui.settings.getSettingValue(SETTING_IDS.FLICK_DIST, 80);
                 const currentSpeedThreshold = app.ui.settings.getSettingValue(SETTING_IDS.FLICK_SPEED, 0.6);
-                
+
                 pointerWrapper.style.opacity = dist > 20 ? "1" : "0.3";
                 if (dist > currentDistThreshold) {
                     const timeDelta = Date.now() - flickStartTime;
                     if (dist / timeDelta > currentSpeedThreshold) {
-                        isTrackingFlick = false; 
+                        isTrackingFlick = false;
                         handleFlick((angle + 360) % 360);
                     }
                 }
@@ -198,25 +201,27 @@ app.registerExtension({
             processResize(closest.cmd);
         }
 
-        window.addEventListener("keydown", (e) => {
+        scope.listen(window, "keydown", (e) => {
+            if (e.key === "Escape") { closePanel(); return; }
+            if (isEditing(e.target)) return;
             // 检查功能是否启用
             const enabled = app.ui.settings.getSettingValue(SETTING_IDS.ENABLED, true);
             if (!enabled) return;
 
             // 获取当前的快捷键设置 (例如 "Alt+S")
             const shortcutStr = app.ui.settings.getSettingValue(SETTING_IDS.SHORTCUT, "Alt+S");
-            
+
             if (!shortcutStr) return;
 
              // 解析快捷键字符串
             const keys = shortcutStr.split('+').map(k => k.trim().toLowerCase());
-            const mainKey = keys.pop(); 
-            
+            const mainKey = keys.pop();
+
             const isCtrl = keys.includes('ctrl') || keys.includes('control');
             const isAlt = keys.includes('alt') || keys.includes('option');
             const isShift = keys.includes('shift');
             const isMeta = keys.includes('meta') || keys.includes('cmd') || keys.includes('command');
-            
+
             if (e.ctrlKey !== isCtrl) return;
             if (e.altKey !== isAlt) return;
             if (e.shiftKey !== isShift) return;
@@ -224,7 +229,7 @@ app.registerExtension({
 
             const code = e.code.toLowerCase();
             const key = e.key.toLowerCase();
-            
+
             let match = false;
             if (key === mainKey) match = true;
             if (code === mainKey) match = true;
@@ -235,7 +240,7 @@ app.registerExtension({
                 const selected = Object.values(app.canvas.selected_nodes || {});
                 if (selected.length < 1) return;
                 e.preventDefault();
-                
+
                 // 互斥：强制关闭对齐面板
                 if (window.__comfy_align_close) window.__comfy_align_close();
 
@@ -252,11 +257,10 @@ app.registerExtension({
                 isTrackingFlick = true;
                 pointerWrapper.style.transform = `rotate(0deg)`;
             }
-            if (e.code === "Escape") closePanel();
         });
 
         // --- 核心修复：点击外部关闭 (使用 pointerdown 和全局标志位) ---
-        window.addEventListener("pointerdown", (e) => {
+        scope.listen(window, "pointerdown", (e) => {
             // 只有当面板处于激活状态时才处理
             if (window.__comfy_resizer_active) {
                 // 如果点击的不是本插件的任何按钮 (使用 closest 方法检测)
@@ -273,7 +277,7 @@ app.registerExtension({
             const nodes = Object.values(app.canvas.selected_nodes || {});
             if (nodes.length < 1) return;
             app.canvas.graph.beforeChange();
-            
+
             const minY = Math.min(...nodes.map(n => n.pos[1]));
             const maxY = Math.max(...nodes.map(n => n.pos[1] + n.size[1]));
             const minX = Math.min(...nodes.map(n => n.pos[0]));
