@@ -106,6 +106,15 @@ const addNodeMenuSettings = [
         tooltip: "Delay in milliseconds before opening a submenu on hover."
     },
 
+    {
+        id: "AddNodeMenu.FollowCursor",
+        name: "New Nodes Follow Cursor",
+        type: "boolean",
+        defaultValue: true,
+        category: ["AlignLayout", "AddNodeMenu", "New Nodes Follow Cursor"],
+        tooltip: "New nodes follow the mouse until placed with a left click. Right click or Esc cancels. When disabled, nodes are placed where the menu was opened."
+    },
+
     // 2. 快捷键
     {
         id: "AddNodeMenu.Shortcut",

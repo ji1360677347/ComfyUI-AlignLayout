@@ -943,7 +943,7 @@ export const createQuickNodeMenu = (scope) => ({
              if (node) {
                  node.pos = [lockedCanvasPos.x, lockedCanvasPos.y];
                  // [修复] 关键修改：使用 app.canvas.graph 而不是 app.graph，确保节点添加到当前视图（包括子图）
-                 const ghost = app.ui.settings.getSettingValue("Comfy.NodeSearchBoxImpl.FollowCursor", true);
+                 const ghost = app.ui.settings.getSettingValue("QuickNodeMenu.FollowCursor", true);
                  app.canvas.graph.add(node, { ghost });
                  app.canvas.selectNode(node);
              }

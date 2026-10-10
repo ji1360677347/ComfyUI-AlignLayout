@@ -457,6 +457,10 @@
         "name": "呼出快捷键",
         "tooltip": "自定义打开菜单的按键或组合键（例如：A, Alt+A）。"
     },
+    "AddNodeMenu_FollowCursor": {
+        "name": "新增节点跟随鼠标",
+        "tooltip": "开启时，节点跟随鼠标，左键确认放置，右键或 Esc 取消添加；关闭时，直接放在唤出菜单时的鼠标位置。"
+    },
     "AddNodeMenu_HoverDelay": {
         "name": "子菜单展开延迟",
         "tooltip": "鼠标悬停多少毫秒后自动展开子菜单。"
@@ -507,6 +511,10 @@
     "QuickNodeMenu_Shortcut": {
         "name": "呼出快捷键 (收藏)",
         "tooltip": "自定义打开收藏菜单的按键或组合键（例如：Q, Alt+Q）。"
+    },
+    "QuickNodeMenu_FollowCursor": {
+        "name": "新增节点跟随鼠标",
+        "tooltip": "开启时，节点跟随鼠标，左键确认放置，右键或 Esc 取消添加；关闭时，直接放在唤出菜单时的鼠标位置。"
     },
     "QuickNodeMenu_HoverDelay": {
         "name": "子菜单展开延迟 (收藏)",
