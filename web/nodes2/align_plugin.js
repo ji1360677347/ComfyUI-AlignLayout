@@ -23,7 +23,9 @@ export const createAligner = (scope) => ({
             BTN_BOTTOM_RIGHT: "NodeAligner.Btn.BottomRight",
             // 默认间距设置
             GAP_H: "NodeAligner.DefaultGap.H",
-            GAP_V: "NodeAligner.DefaultGap.V"
+            GAP_V: "NodeAligner.DefaultGap.V",
+            SPACING_ALIGN_H: "NodeAligner.SpacingAlign.H",
+            SPACING_ALIGN_V: "NodeAligner.SpacingAlign.V"
         };
 
         // --- 核心状态 ---
@@ -49,8 +51,6 @@ export const createAligner = (scope) => ({
             left: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 17.07 17.07"><rect fill="#c2c2c2" x="7.18" y="3.45" width="3.45" height="5.52" rx=".82" transform="translate(2.69 15.12) rotate(-90)"/><rect fill="#c2c2c2" x="6.14" y="8.96" width="8.28" height="3.45" rx=".82"/><line stroke="#c2c2c2" stroke-linecap="round" stroke-width=".69" x1="4.85" y1="13.71" x2="4.85" y2="3.36"/><circle fill="none" stroke="none" cx="8.54" cy="8.54" r="8.54"/></svg>`,
             v_center: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 11 11"><rect fill="#c2c2c2" x="6.33" y="3.2" width="2.07" height="4.6" rx=".58"/><rect fill="#c2c2c2" x="2.71" y="2.05" width="2.48" height="6.9" rx=".64"/><line stroke="#c2c2c2" stroke-linecap="round" stroke-width=".52" x1="1.36" y1="5.5" x2="9.64" y2="5.5"/><circle fill="none" stroke="none" cx="5.5" cy="5.5" r="5.5"/></svg>`,
             h_center: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 11 11"><rect fill="#c2c2c2" x="4.47" y="1.48" width="2.07" height="4.6" rx=".58" transform="translate(1.72 9.28) rotate(-90)"/><rect fill="#c2c2c2" x="2.05" y="5.77" width="6.9" height="2.48" rx=".64"/><line stroke="#c2c2c2" stroke-linecap="round" stroke-width=".52" x1="5.5" y1="9.64" x2="5.5" y2="1.36"/><circle fill="none" stroke="none" cx="5.5" cy="5.5" r="5.5"/></svg>`,
-            dist_h_gap: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 11 11"><rect fill="#c2c2c2" x="4.36" y="2.77" width="2.28" height="5.47" rx=".54"/><line stroke="#c2c2c2" stroke-linecap="round" stroke-width=".69" x1="8.92" y1="2.02" x2="8.92" y2="8.98"/><line stroke="#c2c2c2" stroke-linecap="round" stroke-width=".69" x1="2.08" y1="2.02" x2="2.08" y2="8.98"/><circle fill="none" stroke="none" cx="5.5" cy="5.5" r="5.5"/></svg>`,
-            dist_v_gap: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 11 11"><rect fill="#c2c2c2" x="2.77" y="4.36" width="5.47" height="2.28" rx=".54"/><line stroke="#c2c2c2" stroke-linecap="round" stroke-width=".69" x1="2.02" y1="2.08" x2="8.98" y2="2.08"/><line stroke="#c2c2c2" stroke-linecap="round" stroke-width=".69" x1="2.02" y1="8.92" x2="8.92" y2="8.92"/><circle fill="none" stroke="none" cx="5.5" cy="5.5" r="5.5"/></svg>`,
             spacing_v: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 11 11"><rect fill="#c2c2c2" x="3.08" y="3.46" width="4.84" height="1.83" rx=".46" ry=".46"/><line stroke="#c2c2c2" stroke-linecap="round" stroke-width=".31" x1="8.58" y1="2.68" x2="2.42" y2="2.68"/><rect fill="#c2c2c2" x="3.08" y="6.07" width="4.84" height="1.68" rx=".44" ry=".44"/><line stroke="#c2c2c2" stroke-linecap="round" stroke-width=".31" x1="8.58" y1="8.52" x2="2.42" y2="8.52"/><circle fill="none" stroke="none" cx="5.5" cy="5.5" r="5.5"/></svg>`,
             spacing_h: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 11 11"><rect fill="#c2c2c2" x="3.46" y="3.08" width="1.83" height="4.84" rx=".46" ry=".46"/><line stroke="#c2c2c2" stroke-linecap="round" stroke-width=".31" x1="2.68" y1="2.42" x2="2.68" y2="8.58"/><rect fill="#c2c2c2" x="6.07" y="3.08" width="1.68" height="4.84" rx=".44" ry=".44"/><line stroke="#c2c2c2" stroke-linecap="round" stroke-width=".31" x1="8.52" y1="2.42" x2="8.52" y2="8.58"/><circle fill="none" stroke="none" cx="5.5" cy="5.5" r="5.5"/></svg>`,
             auto_layout: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 11 11"><circle fill="none" stroke="none" cx="5.5" cy="5.5" r="5.5"/><line stroke="#c2c2c2" stroke-linecap="round" stroke-width=".31" x1="5.5" y1="3.71" x2="5.5" y2="5.23"/><rect fill="#c2c2c2" x="4.5" y="2.26" width="2" height="2" rx=".31" ry=".31"/><path fill="none" stroke="#c2c2c2" stroke-linecap="round" stroke-width=".28" d="M3.5,6.92v-1.35c0-.17.14-.3.3-.3h3.39c.17,0,.3.14.3.3v1.35"/><rect fill="#c2c2c2" x="2.5" y="6.26" width="2" height="2" rx=".31" ry=".31"/><rect fill="#c2c2c2" x="6.5" y="6.26" width="2" height="2" rx=".31" ry=".31"/></svg>`
@@ -64,8 +64,6 @@ export const createAligner = (scope) => ({
             "right": "right",
             "v_center": "v_center",
             "h_center": "h_center",
-            "dist_v_gap": "dist_v_gap",
-            "dist_h_gap": "dist_h_gap",
             "spacing_dist_v": "spacing_v",
             "spacing_dist_h": "spacing_h",
             "auto_layout": "auto_layout"
@@ -79,62 +77,107 @@ export const createAligner = (scope) => ({
         // --- 初始化 UI ---
         const panel = document.createElement("div");
         panel.id = "node-align-panel";
-        panel.style.cssText = "display:none; position:fixed; z-index:1001; pointer-events:none; width:500px; height:600px;";
+        panel.style.cssText = "display:none; position:fixed; z-index:1001; pointer-events:none; width:500px; height:400px;";
 
         const ringContainer = document.createElement("div");
         ringContainer.style.cssText = "position:absolute; width:100%; height:400px;";
         panel.appendChild(ringContainer);
 
-        const centralIndicator = document.createElement("div");
-        centralIndicator.style.cssText = `position: absolute; width: 40px; height: 40px; left: 230px; top: 180px; border-radius: 50%; border: 2px solid rgba(194, 194, 194, 0.4); background: rgba(0, 0, 0, 0.15); transition: opacity 0.2s; pointer-events: none;`;
         const pointerWrapper = document.createElement("div");
         pointerWrapper.style.cssText = "position:absolute; width:40px; height:40px; left:230px; top:180px; pointer-events:none; transition:transform 0.05s linear;";
         const triangle = document.createElement("div");
         triangle.style.cssText = "position:absolute; top:-10px; left:50%; transform:translateX(-50%); width:0; height:0; border-left:6px solid transparent; border-right:6px solid transparent; border-bottom:10px solid #c2c2c2;";
         pointerWrapper.appendChild(triangle);
-        ringContainer.appendChild(centralIndicator);
         ringContainer.appendChild(pointerWrapper);
 
-        // 动态构建环形菜单配置
+        const autoLayoutBtn = createPillButton(getIconHtml("auto_layout"), 36, 36, true);
+        autoLayoutBtn.title = "Auto Layout (Graph)";
+        autoLayoutBtn.style.position = "absolute";
+        autoLayoutBtn.style.left = "232px";
+        autoLayoutBtn.style.top = "182px";
+        autoLayoutBtn.onclick = (e) => {
+            e.stopPropagation();
+            if (window.__comfy_auto_layout_instance) {
+                window.__comfy_auto_layout_instance.arrangeNodes();
+                closePanel();
+            } else {
+                console.warn("Auto Layout extension not initialized.");
+            }
+        };
+        ringContainer.appendChild(autoLayoutBtn);
+
+        const getDefaultGap = (cmd) => app.ui.settings.getSettingValue(
+            cmd === "spacing_dist_v" ? SETTING_IDS.GAP_V : SETTING_IDS.GAP_H, 10
+        );
         let ringActions = [];
 
         const updateRingButtons = () => {
-            // 从设置中读取最新配置
             const s = app.ui.settings;
+            const configuredAction = (id, fallback, angle) => {
+                const configured = s.getSettingValue(id, fallback);
+                const cmd = Object.hasOwn(cmdToIconKey, configured) ? configured : fallback;
+                return { cmd, angle };
+            };
             ringActions = [
-                { icon: getIconHtml(s.getSettingValue(SETTING_IDS.BTN_RIGHT, "right")), cmd: s.getSettingValue(SETTING_IDS.BTN_RIGHT, "right"), angle: 0 },
-                { icon: getIconHtml(s.getSettingValue(SETTING_IDS.BTN_BOTTOM_RIGHT, "dist_h_gap")), cmd: s.getSettingValue(SETTING_IDS.BTN_BOTTOM_RIGHT, "dist_h_gap"), angle: 45 },
-                { icon: getIconHtml(s.getSettingValue(SETTING_IDS.BTN_BOTTOM, "bottom")), cmd: s.getSettingValue(SETTING_IDS.BTN_BOTTOM, "bottom"), angle: 90 },
-                { icon: getIconHtml(s.getSettingValue(SETTING_IDS.BTN_BOTTOM_LEFT, "dist_v_gap")), cmd: s.getSettingValue(SETTING_IDS.BTN_BOTTOM_LEFT, "dist_v_gap"), angle: 135 },
-                { icon: getIconHtml(s.getSettingValue(SETTING_IDS.BTN_LEFT, "left")), cmd: s.getSettingValue(SETTING_IDS.BTN_LEFT, "left"), angle: 180 },
-                { icon: getIconHtml(s.getSettingValue(SETTING_IDS.BTN_TOP_LEFT, "h_center")), cmd: s.getSettingValue(SETTING_IDS.BTN_TOP_LEFT, "h_center"), angle: 225 },
-                { icon: getIconHtml(s.getSettingValue(SETTING_IDS.BTN_TOP, "top")), cmd: s.getSettingValue(SETTING_IDS.BTN_TOP, "top"), angle: 270 },
-                { icon: getIconHtml(s.getSettingValue(SETTING_IDS.BTN_TOP_RIGHT, "v_center")), cmd: s.getSettingValue(SETTING_IDS.BTN_TOP_RIGHT, "v_center"), angle: 315 },
+                configuredAction(SETTING_IDS.BTN_RIGHT, "right", 0),
+                configuredAction(SETTING_IDS.BTN_BOTTOM_RIGHT, "spacing_dist_h", 45),
+                configuredAction(SETTING_IDS.BTN_BOTTOM, "bottom", 90),
+                configuredAction(SETTING_IDS.BTN_BOTTOM_LEFT, "spacing_dist_v", 135),
+                configuredAction(SETTING_IDS.BTN_LEFT, "left", 180),
+                configuredAction(SETTING_IDS.BTN_TOP_LEFT, "h_center", 225),
+                configuredAction(SETTING_IDS.BTN_TOP, "top", 270),
+                configuredAction(SETTING_IDS.BTN_TOP_RIGHT, "v_center", 315)
             ];
 
-            while (ringContainer.querySelectorAll('.comfy-node-align-btn').length > 0) {
-                ringContainer.querySelector('.comfy-node-align-btn').remove();
-            }
-
-            const currentRadius = app.ui.settings.getSettingValue(SETTING_IDS.RADIUS, 140);
-
+            ringContainer.querySelectorAll(".comfy-node-align-action").forEach(btn => btn.remove());
+            const currentRadius = s.getSettingValue(SETTING_IDS.RADIUS, 140);
             ringActions.forEach(action => {
-                const isSpecial = ["top", "bottom", "left", "right"].includes(action.cmd);
-                const w = isSpecial ? 63 : 54;
-                const h = isSpecial ? 42 : 36;
-                const btn = createPillButton(action.icon, w, h, false);
-                const rad = (action.angle * Math.PI) / 180;
-                btn.style.left = `${250 + currentRadius * Math.cos(rad) - (w / 2)}px`;
-                btn.style.top = `${200 + currentRadius * Math.sin(rad) - (h / 2)}px`;
-                btn.onclick = (e) => { e.stopPropagation(); alignNodes(action.cmd); };
-                ringContainer.appendChild(btn);
+                const rad = action.angle * Math.PI / 180;
+                const x = 250 + currentRadius * Math.cos(rad);
+                const y = 200 + currentRadius * Math.sin(rad);
+                let control;
+                if (action.cmd === "spacing_dist_v" || action.cmd === "spacing_dist_h") {
+                    const vertical = action.cmd === "spacing_dist_v";
+                    const cached = vertical ? cachedGapV : cachedGapH;
+                    control = createCapsuleGroup(action.cmd,
+                        vertical ? "Vertical Distribution Spacing"
+                            : "Horizontal Distribution Spacing",
+                        cached !== null ? cached : getDefaultGap(action.cmd),
+                        (val) => { if (vertical) cachedGapV = val; else cachedGapH = val; });
+                    control.style.position = "absolute";
+                    control.style.left = `${x}px`;
+                    // 小半径时外移下方胶囊，避免与底部控件重叠。
+                    if (action.angle === 45 || action.angle === 135) {
+                        const offset = Math.max(currentRadius * Math.SQRT1_2, 96);
+                        control.style.left = `${250 + (action.angle === 45 ? offset : -offset)}px`;
+                    }
+                    control.style.top = `${y}px`;
+                    control.style.transform = "translate(-50%, -50%)";
+                } else {
+                    const isSpecial = ["top", "bottom", "left", "right"].includes(action.cmd);
+                    const w = isSpecial ? 63 : 54;
+                    const h = isSpecial ? 42 : 36;
+                    control = createPillButton(getIconHtml(action.cmd), w, h, false);
+                    control.style.left = `${x - w / 2}px`;
+                    control.style.top = `${y - h / 2}px`;
+                    control.onclick = (e) => { e.stopPropagation(); alignNodes(action.cmd); };
+                }
+                control.classList.add("comfy-node-align-action");
+                ringContainer.appendChild(control);
             });
         };
 
-        // --- 底部控制栏 ---
-        const bottomRow = document.createElement("div");
-        bottomRow.style.cssText = "position:absolute; bottom:160px; left:0; width:100%; display:flex; justify-content:center; align-items:center; gap:40px;";
-        panel.appendChild(bottomRow);
+        // 数字框的步进箭头会在右侧预留空白，去除后数值可以靠近执行图标。
+        const inputStyle = document.createElement("style");
+        inputStyle.textContent = `
+            #node-align-panel input[type="number"]::-webkit-inner-spin-button,
+            #node-align-panel input[type="number"]::-webkit-outer-spin-button {
+                -webkit-appearance: none;
+                margin: 0;
+            }
+        `;
+        document.head.appendChild(inputStyle);
+        scope.add(() => inputStyle.remove());
 
         // 创建胶囊型控制组 (左数值 - 右图标)
         // [修改] 参数改为 currentValue 和 onInput 回调
@@ -142,13 +185,16 @@ export const createAligner = (scope) => ({
             const iconHtml = getIconHtml(cmd);
             const container = document.createElement("div");
             container.style.cssText = `
+                box-sizing: border-box;
+                height: 36px;
                 display: flex;
                 align-items: center;
-                gap: 2px;
+                gap: 1px;
                 background: ${btnBg};
                 border: 1px solid rgba(102, 102, 102, 0.3);
                 border-radius: 999px;
-                padding: 4px 8px;
+                /* 补偿右侧按钮与 SVG 内部的留白，使可见内容两侧间距一致。 */
+                padding: 3px 8px 3px 15px;
                 pointer-events: auto;
                 box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
             `;
@@ -160,44 +206,49 @@ export const createAligner = (scope) => ({
             input.value = currentValue;
 
             input.style.cssText = `
-                width: 40px;
                 height: 24px;
+                flex-shrink: 0;
                 background: transparent;
                 border: none;
                 color: #666;
-                text-align: right;
+                text-align: left;
                 font-size: 13px;
                 line-height: 24px;
-                padding-top: 2px;
+                padding: 2px 0 1px;
+                appearance: textfield;
                 outline: none;
                 transition: color 0.2s;
             `;
+
+            const updateInputWidth = () => {
+                input.style.width = `calc(${Math.max(1, input.value.length)}ch + 2px)`;
+            };
+            updateInputWidth();
 
             const highlightInput = () => { input.style.color = "#c2c2c2"; };
             const dimInput = () => { if(document.activeElement !== input) input.style.color = "#666"; };
 
             input.onmouseenter = highlightInput;
             input.onmouseleave = dimInput;
-            input.onfocus = highlightInput;
+            input.onfocus = () => { isTrackingFlick = false; highlightInput(); };
             input.onblur = dimInput;
             input.onclick = (e) => { e.stopPropagation(); input.focus(); };
             input.onpointerdown = (e) => e.stopPropagation();
 
-            // [修改] 监听输入变化，更新内存变量
-            if (onInput) {
-                input.addEventListener("input", () => {
-                   onInput(input.value);
-                });
-            }
+            input.addEventListener("input", () => {
+                updateInputWidth();
+                onInput?.(input.value);
+            });
 
             const trigger = () => {
                 let val = parseInt(input.value);
-                if (isNaN(val)) val = 50;
+                if (isNaN(val)) val = getDefaultGap(cmd);
                 alignNodes(cmd, val);
             };
             input.onkeydown = (e) => {
                 e.stopPropagation();
                 if (e.key === "Enter") trigger();
+                else if (e.key === "Escape") closePanel();
             };
 
             const btn = document.createElement("div");
@@ -239,50 +290,6 @@ export const createAligner = (scope) => ({
             return container;
         };
 
-        // 动态刷新底部栏 (恢复为固定三个按钮，但读取默认间距设置)
-        const updateBottomRow = () => {
-            bottomRow.innerHTML = ""; // 清空
-            const s = app.ui.settings;
-
-            // 获取用户设置的默认间距
-            const defGapV = s.getSettingValue(SETTING_IDS.GAP_V, 50);
-            const defGapH = s.getSettingValue(SETTING_IDS.GAP_H, 50);
-
-            // [修改] 优先使用内存中的值，如果为 null 则使用默认值
-            const currentV = cachedGapV !== null ? cachedGapV : defGapV;
-            const currentH = cachedGapH !== null ? cachedGapH : defGapH;
-
-            // 1. 左侧胶囊 (垂直分布)
-            bottomRow.appendChild(createCapsuleGroup(
-                "spacing_dist_v",
-                "Vertical Distribution Spacing (Stack & Center X)",
-                currentV,
-                (val) => cachedGapV = val // 回调更新内存变量
-            ));
-
-            // 2. 中间按钮 (自动布局)
-            const autoLayoutBtn = createPillButton(getIconHtml("auto_layout"), 36, 36, true);
-            autoLayoutBtn.title = "Auto Layout (Graph)";
-            autoLayoutBtn.onclick = (e) => {
-                e.stopPropagation();
-                if (window.__comfy_auto_layout_instance) {
-                    window.__comfy_auto_layout_instance.arrangeNodes();
-                    closePanel();
-                } else {
-                    console.warn("Auto Layout extension not initialized.");
-                }
-            };
-            bottomRow.appendChild(autoLayoutBtn);
-
-            // 3. 右侧胶囊 (水平分布)
-            bottomRow.appendChild(createCapsuleGroup(
-                "spacing_dist_h",
-                "Horizontal Distribution Spacing (Row & Center Y)",
-                currentH,
-                (val) => cachedGapH = val // 回调更新内存变量
-            ));
-        };
-
         document.body.appendChild(panel);
 
         function createPillButton(html, w, h, isStatic = false) {
@@ -322,7 +329,7 @@ export const createAligner = (scope) => ({
             if (!enabled) return;
 
             lastMousePos = { x: e.clientX, y: e.clientY };
-            if (panel.style.display === "block" && isTrackingFlick && flickStartPos) {
+            if (panel.style.display === "block" && flickStartPos) {
                 const dx = e.clientX - flickStartPos.x;
                 const dy = e.clientY - flickStartPos.y;
                 const dist = Math.sqrt(dx * dx + dy * dy);
@@ -333,7 +340,7 @@ export const createAligner = (scope) => ({
                 const currentSpeedThreshold = app.ui.settings.getSettingValue(SETTING_IDS.FLICK_SPEED, 0.6);
 
                 pointerWrapper.style.opacity = dist > 20 ? "1" : "0.3";
-                if (dist > currentDistThreshold) {
+                if (isTrackingFlick && dist > currentDistThreshold) {
                     const timeDelta = Date.now() - flickStartTime;
                     if (dist / timeDelta > currentSpeedThreshold) {
                         isTrackingFlick = false;
@@ -351,7 +358,11 @@ export const createAligner = (scope) => ({
                 if (diff > 180) diff = 360 - diff;
                 if (diff < minDiff) { minDiff = diff; closest = a; }
             });
-            alignNodes(closest.cmd);
+            if (closest.cmd === "spacing_dist_v" || closest.cmd === "spacing_dist_h") {
+                alignNodes(closest.cmd, getDefaultGap(closest.cmd));
+            } else {
+                alignNodes(closest.cmd);
+            }
         }
 
         scope.listen(window, "keydown", (e) => {
@@ -392,7 +403,6 @@ export const createAligner = (scope) => ({
                 if (window.__comfy_resizer_close) window.__comfy_resizer_close();
 
                 updateRingButtons();
-                updateBottomRow(); // 每次打开时更新底部栏
 
                 panel.style.left = (lastMousePos.x - 250) + "px";
                 panel.style.top = (lastMousePos.y - 200) + "px";
@@ -403,20 +413,20 @@ export const createAligner = (scope) => ({
                 flickStartTime = Date.now();
                 isTrackingFlick = true;
                 pointerWrapper.style.transform = `rotate(0deg)`;
+                pointerWrapper.style.opacity = "0.3";
             }
         });
 
         scope.listen(window, "pointerdown", (e) => {
-            if (window.__comfy_align_active) {
-                if (e.target.tagName === "INPUT") return;
-                if (!e.target.closest(".comfy-node-align-btn") && !e.target.closest("input") && !e.target.closest("div[style*='border-radius: 999px']")) {
-                    closePanel();
-                    isTrackingFlick = false;
-                }
+            if (!window.__comfy_align_active) return;
+            if (panel.contains(e.target)) {
+                isTrackingFlick = false;
+                return;
             }
+            closePanel();
         }, true);
 
-        function alignNodes(type, value = 50) {
+        function alignNodes(type, value = 10) {
             const nodes = Object.values(app.canvas.selected_nodes || {});
             if (nodes.length < 2) return;
             app.canvas.graph.beforeChange();
@@ -424,7 +434,11 @@ export const createAligner = (scope) => ({
                 if (type === "auto_layout") {
                     window.__comfy_auto_layout_instance?.arrangeNodes();
                 } else {
-                    alignSelection(nodes, type, value);
+                    const horizontal = type === "spacing_dist_h";
+                    const alignment = app.ui.settings.getSettingValue(
+                        horizontal ? SETTING_IDS.SPACING_ALIGN_H : SETTING_IDS.SPACING_ALIGN_V,
+                        horizontal ? "top" : "left");
+                    alignSelection(nodes, type, value, alignment);
                 }
             } finally {
                 app.canvas.graph.afterChange();
@@ -439,14 +453,14 @@ function titleHeight() {
     return LiteGraph.NODE_TITLE_HEIGHT;
 }
 
-function size(node) {
-    return [...node.renderingSize];
-}
-
 function bounds(node) {
-    const [width, height] = size(node);
     const title = titleHeight(node);
-    return { x: node.pos[0], y: node.pos[1] - title, width, height: height + title };
+    const element = document.querySelector(`.lg-node[data-node-id="${CSS.escape(String(node.id))}"]`);
+    const rect = element?.getBoundingClientRect();
+    const scale = app.canvas.ds.scale;
+    const width = rect?.width ? rect.width / scale : node.renderingSize[0];
+    const height = rect?.height ? rect.height / scale : node.renderingSize[1] + title;
+    return { x: node.pos[0], y: node.pos[1] - title, width, height };
 }
 
 function setPosition(node, x, y) {
@@ -470,7 +484,7 @@ function ordered(nodes, axis) {
     return [anchor, ...rest];
 }
 
-function alignSelection(nodes, command, gap) {
+function alignSelection(nodes, command, gap, alignment) {
     const boxes = nodes.map(bounds);
     const left = Math.min(...boxes.map(box => box.x));
     const right = Math.max(...boxes.map(box => box.x + box.width));
@@ -478,22 +492,21 @@ function alignSelection(nodes, command, gap) {
     const bottom = Math.max(...boxes.map(box => box.y + box.height));
     const centerX = boxes.reduce((sum, box) => sum + box.x + box.width / 2, 0) / nodes.length;
     const centerY = boxes.reduce((sum, box) => sum + box.y + box.height / 2, 0) / nodes.length;
-    if (command.startsWith("dist_") || command.startsWith("spacing_dist_")) {
-        const horizontal = command.endsWith("h") || command === "dist_h_gap";
+    if (command.startsWith("spacing_dist_")) {
+        const horizontal = command === "spacing_dist_h";
         const axis = horizontal ? "x" : "y";
         const dimension = horizontal ? "width" : "height";
-        const fixed = command.startsWith("spacing_");
-        const sorted = fixed ? ordered(nodes, axis) : [...nodes].sort((a, b) => bounds(a)[axis] - bounds(b)[axis]);
+        const sorted = ordered(nodes, axis);
         const anchor = bounds(sorted[0]);
-        const total = boxes.reduce((sum, box) => sum + box[dimension], 0);
-        const spacing = fixed ? gap : ((horizontal ? right - left : bottom - top) - total) / (nodes.length - 1);
-        let cursor = fixed ? anchor[axis] : (horizontal ? left : top);
+        const factor = alignment === "center" ? 0.5
+            : alignment === "bottom" || alignment === "right" ? 1 : 0;
+        let cursor = anchor[axis];
         for (const node of sorted) {
             const box = bounds(node);
-            const x = horizontal ? cursor : (fixed ? anchor.x + (anchor.width - box.width) / 2 : box.x);
-            const y = horizontal ? (fixed ? anchor.y + (anchor.height - box.height) / 2 : box.y) : cursor;
+            const x = horizontal ? cursor : anchor.x + (anchor.width - box.width) * factor;
+            const y = horizontal ? anchor.y + (anchor.height - box.height) * factor : cursor;
             setPosition(node, x, y);
-            cursor += box[dimension] + spacing;
+            cursor += box[dimension] + gap;
         }
         return;
     }

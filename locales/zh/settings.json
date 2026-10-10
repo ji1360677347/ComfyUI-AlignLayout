@@ -169,8 +169,26 @@
         "name": "默认垂直间距",
         "tooltip": "使用垂直分布间距功能时的默认数值 (像素)"
     },
+    "NodeAligner_SpacingAlign_H": {
+        "name": "水平指定间距分布",
+        "tooltip": "以最左侧锚点节点为基准，选择上对齐、水平居中或下对齐。锚点保持不动。",
+        "options": {
+            "Align Top": "上对齐",
+            "Center Horizontally": "水平居中",
+            "Align Bottom": "下对齐"
+        }
+    },
+    "NodeAligner_SpacingAlign_V": {
+        "name": "垂直指定间距分布",
+        "tooltip": "以最上方锚点节点为基准，选择左对齐、垂直居中或右对齐。锚点保持不动。",
+        "options": {
+            "Align Left": "左对齐",
+            "Center Vertically": "垂直居中",
+            "Align Right": "右对齐"
+        }
+    },
     "NodeAligner_Btn_Top": {
-        "name": "环形菜单 - 上方",
+        "name": "环形菜单 - 上",
         "tooltip": "上方位置 (12点方向) 的按钮功能",
         "options": {
             "Align Top": "上对齐",
@@ -179,10 +197,8 @@
             "Align Right": "右对齐",
             "Center Vertically": "垂直居中",
             "Center Horizontally": "水平居中",
-            "Distribute Vertically": "垂直平均分布",
-            "Distribute Horizontally": "水平平均分布",
-            "Stack Vertically": "垂直分布间距",
-            "Stack Horizontally": "水平分布间距",
+            "Stack Vertically": "垂直指定间距分布",
+            "Stack Horizontally": "水平指定间距分布",
             "Auto Layout": "自动布局"
         }
     },
@@ -196,15 +212,13 @@
             "Align Right": "右对齐",
             "Center Vertically": "垂直居中",
             "Center Horizontally": "水平居中",
-            "Distribute Vertically": "垂直平均分布",
-            "Distribute Horizontally": "水平平均分布",
-            "Stack Vertically": "垂直分布间距",
-            "Stack Horizontally": "水平分布间距",
+            "Stack Vertically": "垂直指定间距分布",
+            "Stack Horizontally": "水平指定间距分布",
             "Auto Layout": "自动布局"
         }
     },
     "NodeAligner_Btn_Right": {
-        "name": "环形菜单 - 右方",
+        "name": "环形菜单 - 右",
         "tooltip": "右方位置 (3点方向) 的按钮功能",
         "options": {
             "Align Top": "上对齐",
@@ -213,10 +227,8 @@
             "Align Right": "右对齐",
             "Center Vertically": "垂直居中",
             "Center Horizontally": "水平居中",
-            "Distribute Vertically": "垂直平均分布",
-            "Distribute Horizontally": "水平平均分布",
-            "Stack Vertically": "垂直分布间距",
-            "Stack Horizontally": "水平分布间距",
+            "Stack Vertically": "垂直指定间距分布",
+            "Stack Horizontally": "水平指定间距分布",
             "Auto Layout": "自动布局"
         }
     },
@@ -230,15 +242,13 @@
             "Align Right": "右对齐",
             "Center Vertically": "垂直居中",
             "Center Horizontally": "水平居中",
-            "Distribute Vertically": "垂直平均分布",
-            "Distribute Horizontally": "水平平均分布",
-            "Stack Vertically": "垂直分布间距",
-            "Stack Horizontally": "水平分布间距",
+            "Stack Vertically": "垂直指定间距分布",
+            "Stack Horizontally": "水平指定间距分布",
             "Auto Layout": "自动布局"
         }
     },
     "NodeAligner_Btn_Bottom": {
-        "name": "环形菜单 - 下方",
+        "name": "环形菜单 - 下",
         "tooltip": "下方位置 (6点方向) 的按钮功能",
         "options": {
             "Align Top": "上对齐",
@@ -247,10 +257,8 @@
             "Align Right": "右对齐",
             "Center Vertically": "垂直居中",
             "Center Horizontally": "水平居中",
-            "Distribute Vertically": "垂直平均分布",
-            "Distribute Horizontally": "水平平均分布",
-            "Stack Vertically": "垂直分布间距",
-            "Stack Horizontally": "水平分布间距",
+            "Stack Vertically": "垂直指定间距分布",
+            "Stack Horizontally": "水平指定间距分布",
             "Auto Layout": "自动布局"
         }
     },
@@ -264,15 +272,13 @@
             "Align Right": "右对齐",
             "Center Vertically": "垂直居中",
             "Center Horizontally": "水平居中",
-            "Distribute Vertically": "垂直平均分布",
-            "Distribute Horizontally": "水平平均分布",
-            "Stack Vertically": "垂直分布间距",
-            "Stack Horizontally": "水平分布间距",
+            "Stack Vertically": "垂直指定间距分布",
+            "Stack Horizontally": "水平指定间距分布",
             "Auto Layout": "自动布局"
         }
     },
     "NodeAligner_Btn_Left": {
-        "name": "环形菜单 - 左方",
+        "name": "环形菜单 - 左",
         "tooltip": "左方位置 (9点方向) 的按钮功能",
         "options": {
             "Align Top": "上对齐",
@@ -281,10 +287,8 @@
             "Align Right": "右对齐",
             "Center Vertically": "垂直居中",
             "Center Horizontally": "水平居中",
-            "Distribute Vertically": "垂直平均分布",
-            "Distribute Horizontally": "水平平均分布",
-            "Stack Vertically": "垂直分布间距",
-            "Stack Horizontally": "水平分布间距",
+            "Stack Vertically": "垂直指定间距分布",
+            "Stack Horizontally": "水平指定间距分布",
             "Auto Layout": "自动布局"
         }
     },
@@ -298,10 +302,8 @@
             "Align Right": "右对齐",
             "Center Vertically": "垂直居中",
             "Center Horizontally": "水平居中",
-            "Distribute Vertically": "垂直平均分布",
-            "Distribute Horizontally": "水平平均分布",
-            "Stack Vertically": "垂直分布间距",
-            "Stack Horizontally": "水平分布间距",
+            "Stack Vertically": "垂直指定间距分布",
+            "Stack Horizontally": "水平指定间距分布",
             "Auto Layout": "自动布局"
         }
     },

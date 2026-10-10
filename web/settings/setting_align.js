@@ -12,8 +12,6 @@ const alignOptions = [
     { text: "Align Right", value: "right" },
     { text: "Center Vertically", value: "v_center" },
     { text: "Center Horizontally", value: "h_center" },
-    { text: "Distribute Vertically", value: "dist_v_gap" },
-    { text: "Distribute Horizontally", value: "dist_h_gap" },
     { text: "Stack Vertically", value: "spacing_dist_v" },
     { text: "Stack Horizontally", value: "spacing_dist_h" },
     { text: "Auto Layout", value: "auto_layout" }
@@ -53,7 +51,7 @@ const nodeAlignerSettings = [
         id: "NodeAligner.Btn.BottomRight",
         name: "Ring Bottom-Right",
         type: "combo",
-        defaultValue: "dist_h_gap",
+        defaultValue: "spacing_dist_h",
         options: alignOptions,
         category: ["AlignLayout", "NodeAligner", "Button Bottom-Right"],
         tooltip: "Action for the Bottom-Right position."
@@ -71,7 +69,7 @@ const nodeAlignerSettings = [
         id: "NodeAligner.Btn.BottomLeft",
         name: "Ring Bottom-Left",
         type: "combo",
-        defaultValue: "dist_v_gap",
+        defaultValue: "spacing_dist_v",
         options: alignOptions,
         category: ["AlignLayout", "NodeAligner", "Button Bottom-Left"],
         tooltip: "Action for the Bottom-Left position."
@@ -95,21 +93,47 @@ const nodeAlignerSettings = [
         tooltip: "Action for the Top-Left position."
     },
 
-    // --- 默认间距设置 ---
+    // --- 间距与对齐设置 (界面倒序显示，对齐项注册在间距项之前) ---
+    {
+        id: "NodeAligner.SpacingAlign.H",
+        name: "Horizontal Spacing Alignment",
+        type: "combo",
+        defaultValue: "top",
+        options: [
+            { text: "Align Top", value: "top" },
+            { text: "Center Horizontally", value: "center" },
+            { text: "Align Bottom", value: "bottom" }
+        ],
+        category: ["AlignLayout", "NodeAligner", "Default Gap H Alignment"],
+        tooltip: "Align the row to the top, center or bottom of the leftmost anchor node."
+    },
     {
         id: "NodeAligner.DefaultGap.H",
         name: "Default Horizontal Spacing",
         type: "number",
-        defaultValue: 50,
+        defaultValue: 10,
         category: ["AlignLayout", "NodeAligner", "Default Gap H"],
         attrs: { min: 0, max: 500, step: 10 },
         tooltip: "Default value for horizontal spacing when using spacing distribution."
     },
     {
+        id: "NodeAligner.SpacingAlign.V",
+        name: "Vertical Spacing Alignment",
+        type: "combo",
+        defaultValue: "left",
+        options: [
+            { text: "Align Left", value: "left" },
+            { text: "Center Vertically", value: "center" },
+            { text: "Align Right", value: "right" }
+        ],
+        category: ["AlignLayout", "NodeAligner", "Default Gap V Alignment"],
+        tooltip: "Align the column to the left, center or right of the topmost anchor node."
+    },
+    {
         id: "NodeAligner.DefaultGap.V",
         name: "Default Vertical Spacing",
         type: "number",
-        defaultValue: 50,
+        defaultValue: 10,
         category: ["AlignLayout", "NodeAligner", "Default Gap V"],
         attrs: { min: 0, max: 500, step: 10 },
         tooltip: "Default value for vertical spacing when using spacing distribution."
