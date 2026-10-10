@@ -13,7 +13,7 @@ const addNodeMenuSettings = [
         type: "boolean",
         defaultValue: true,
         category: ["AlignLayout", "AddNodeMenu", "Remember Last Category"],
-        tooltip: "Remember the last opened folder when reopening the menu."
+        tooltip: "Remember the last opened group at each menu level. Submenus align the remembered group with their parent and open on hover."
     },
 
     // 11. 排除列表 (过滤)

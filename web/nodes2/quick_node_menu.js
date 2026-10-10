@@ -154,7 +154,7 @@ export const createQuickNodeMenu = (scope) => ({
         let cachedData = {
             quick_list: [],     // 对应 add_node_menu_quick.json 的内容
             pins: {},           // Quick Menu 自己的 pins (quick_menu_pins.json)
-            last_category: null // Quick Menu 自己的 last_category
+            last_category: {} // Quick Menu 自己的 last_category
         };
 
         // 特殊键：用于存储所有被置顶的“节点”的类名 (Class Name)
@@ -172,6 +172,9 @@ export const createQuickNodeMenu = (scope) => ({
                 const data = await res.json();
                 if (data) {
                     cachedData = data;
+                    cachedData.last_category = typeof data.last_category === "string"
+                        ? { root: data.last_category }
+                        : (data.last_category || {});
                     if (!cachedData.pins) cachedData.pins = {};
                     if (!cachedData.pins[GLOBAL_NODE_PINS_KEY]) cachedData.pins[GLOBAL_NODE_PINS_KEY] = [];
                 }
@@ -379,14 +382,16 @@ export const createQuickNodeMenu = (scope) => ({
             }
         }
 
-        function updateLastCategory(key) {
-            // 检查设置：是否记住上次分类
-            const shouldRemember = app.ui.settings.getSettingValue("QuickNodeMenu.RememberLast", true);
-            if (!shouldRemember) return;
+        function getLastCategory(parentPath) {
+            if (!app.ui.settings.getSettingValue("QuickNodeMenu.RememberLast", true)) return null;
+            return cachedData.last_category?.[parentPath];
+        }
 
-            if (cachedData.last_category === key) return;
-            cachedData.last_category = key;
-            saveLastCategory(key);
+        function updateLastCategory(parentPath, key) {
+            if (!app.ui.settings.getSettingValue("QuickNodeMenu.RememberLast", true)) return;
+            if (cachedData.last_category[parentPath] === key) return;
+            cachedData.last_category[parentPath] = key;
+            saveLastCategory(cachedData.last_category);
         }
 
         // --- 构建树 ---
@@ -516,6 +521,7 @@ export const createQuickNodeMenu = (scope) => ({
                 e.preventDefault();
                 e.stopPropagation();
 
+                if (hoverTimer) clearTimeout(hoverTimer);
                 const currentTop = parseFloat(container.style.top) || 0;
                 const delta = e.deltaY;
                 let newTop = currentTop - delta;
@@ -740,7 +746,7 @@ export const createQuickNodeMenu = (scope) => ({
                 const isItemPinned = isPinned(parentPath, key, itemData._isCategory, itemData.type);
                 if (isItemPinned) itemDiv.classList.add("pinned");
 
-                if (levelIndex === 0) itemDiv.dataset.key = key;
+                itemDiv.dataset.key = key;
 
                 const contentWrapper = document.createElement("div");
                 contentWrapper.style.display = "flex";
@@ -846,7 +852,6 @@ export const createQuickNodeMenu = (scope) => ({
                 if (itemData._isCategory) {
                     const nextPath = parentPath === "root" ? key : (parentPath + "/" + key);
                     const activateSubmenu = () => {
-                        if (levelIndex === 0) updateLastCategory(key);
                         const siblings = container.querySelectorAll('.quick-menu-item');
                         siblings.forEach(s => s.classList.remove('active'));
                         itemDiv.classList.add('active');
@@ -857,8 +862,10 @@ export const createQuickNodeMenu = (scope) => ({
                         const delay = app.ui.settings.getSettingValue("QuickNodeMenu.HoverDelay", 40);
 
                         hoverTimer = scope.timeout(() => {
+                            if (menuStack[levelIndex + 1]?._menuArgs.parentPath === nextPath) return;
                             closeLevelsAfter(levelIndex);
                             closeContextMenu();
+                            updateLastCategory(parentPath, key);
                             const rect = itemDiv.getBoundingClientRect();
                             let subX = rect.right - 1;
                             let subY = rect.top;
@@ -867,12 +874,19 @@ export const createQuickNodeMenu = (scope) => ({
 
                             // 边界检查
                             const subRect = subMenuEl.getBoundingClientRect();
+                            const lastChild = getLastCategory(nextPath);
+                            const targetEl = lastChild ? Array.from(subMenuEl.children).find(el => el.dataset.key === lastChild) : null;
                             if (subRect.right > window.innerWidth) subMenuEl.style.left = (rect.left - subRect.width + 1) + "px";
-                            if (subRect.height > window.innerHeight) subMenuEl.style.top = "10px";
+                            if (targetEl) {
+                                const targetRect = targetEl.getBoundingClientRect();
+                                const targetY = targetRect.top - subRect.top + targetRect.height / 2;
+                                const top = rect.top + rect.height / 2 - targetY;
+                                subMenuEl.style.top = Math.max(50 - subRect.height, Math.min(window.innerHeight - 50, top)) + "px";
+                            } else if (subRect.height > window.innerHeight) subMenuEl.style.top = "10px";
                             else if (subRect.bottom > window.innerHeight) subMenuEl.style.top = Math.max(0, window.innerHeight - subRect.height - 10) + "px";
                         }, delay);
                     };
-                    itemDiv.addEventListener("mouseenter", activateSubmenu);
+                    itemDiv.onmouseenter = activateSubmenu;
                     itemDiv.addEventListener("click", (e) => { e.stopPropagation(); activateSubmenu(); });
                 } else {
                     itemDiv.addEventListener("click", () => {
@@ -993,18 +1007,18 @@ export const createQuickNodeMenu = (scope) => ({
 
                 // 定位逻辑 (记忆上次位置)
                 // 检查是否应该记住上次位置
-                const shouldRemember = app.ui.settings.getSettingValue("QuickNodeMenu.RememberLast", true);
-                const lastCategory = shouldRemember ? cachedData.last_category : null;
+                const lastCategory = getLastCategory("root");
 
                 let targetOffsetY = 0;
                 let targetOffsetX = 0;
                 const rect = rootMenu.getBoundingClientRect();
                 let targetEl = null;
-                if (lastCategory) targetEl = rootMenu.querySelector(`.quick-menu-item[data-key="${lastCategory}"]`);
+                if (lastCategory) targetEl = Array.from(rootMenu.children).find(el => el.dataset.key === lastCategory);
 
                 if (targetEl) {
-                    targetOffsetY = targetEl.offsetTop + (targetEl.offsetHeight / 2);
-                    targetOffsetX = targetEl.offsetLeft + (targetEl.offsetWidth / 2);
+                    const targetRect = targetEl.getBoundingClientRect();
+                    targetOffsetY = targetRect.top - rect.top + targetRect.height / 2;
+                    targetOffsetX = targetRect.left - rect.left + targetRect.width / 2;
                 } else {
                     targetOffsetY = rect.height / 2;
                     targetOffsetX = rect.width / 2;
@@ -1029,7 +1043,17 @@ export const createQuickNodeMenu = (scope) => ({
                 }
                 rootMenu.style.top = `${finalTop}px`;
                 rootMenu.style.left = `${finalLeft}px`;
-                requestAnimationFrame(() => { rootMenu.classList.add('visible'); });
+                requestAnimationFrame(() => {
+                    if (!rootMenu.isConnected) return;
+                    rootMenu.classList.add('visible');
+                    if (targetEl) {
+                        const targetRect = targetEl.getBoundingClientRect();
+                        if (globalMouse.x >= targetRect.left && globalMouse.x <= targetRect.right
+                            && globalMouse.y >= targetRect.top && globalMouse.y <= targetRect.bottom) {
+                            targetEl.onmouseenter?.();
+                        }
+                    }
+                });
             });
         }
 

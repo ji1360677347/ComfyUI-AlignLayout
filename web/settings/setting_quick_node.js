@@ -13,7 +13,7 @@ const quickNodeMenuSettings = [
         type: "boolean",
         defaultValue: true,
         category: ["AlignLayout", "QuickNodeMenu", "Remember Last Category"],
-        tooltip: "Remember the last opened folder when reopening the menu."
+        tooltip: "Remember the last opened group at each menu level. Submenus align the remembered group with their parent and open on hover."
     },
 
     // 8. 悬停高亮颜色 (紫色)
