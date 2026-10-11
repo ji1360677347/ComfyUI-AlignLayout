@@ -17,8 +17,8 @@ export function createFeatures(scope) {
         createAddNodeMenu(scope),
         createQuickNodeMenu(scope),
         createFastLink(scope),
-        createLinkCut(scope),
         createPortConnectMenu(scope),
+        createLinkCut(scope),
         createReplaceNode(scope),
         createSelectSame(scope)
     ];

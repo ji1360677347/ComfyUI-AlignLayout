@@ -8,120 +8,31 @@ function getSetting(id, defaultValue) {
 
 const slotName = (slot) => slot.label || slot.localized_name || slot.name;
 
-function drawPreviewNode(ctx, node, selectedPort) {
-    const [x, y, width, height] = node.getBounding();
-    const titleHeight = LiteGraph.NODE_TITLE_HEIGHT;
-    ctx.save();
-    ctx.globalAlpha = node.mode === 2 ? 0.5 : 1;
-    ctx.fillStyle = node.renderingBgColor;
-    ctx.beginPath();
-    ctx.roundRect(x, y, width, height, node.renderingShape === 1 ? 0 : 8);
-    ctx.fill();
-    ctx.fillStyle = node.renderingColor;
-    ctx.fillRect(x, y, width, Math.min(titleHeight, height));
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(x + 8, y, Math.max(0, width - 16), titleHeight);
-    ctx.clip();
-    ctx.font = "14px Arial, sans-serif";
-    ctx.fillStyle = LiteGraph.NODE_TITLE_COLOR;
-    ctx.fillText(node.title, x + 8, y + titleHeight * 0.7);
-    ctx.restore();
-    if (!node.flags.collapsed) {
-        ctx.font = "12px Arial, sans-serif";
-        for (const input of [true, false]) {
-            const slots = input ? node.inputs : node.outputs;
-            for (const [index, slot] of slots.entries()) {
-                const point = input ? node.getInputPos(index) : node.getOutputPos(index);
-                const connected = input ? slot.link != null : slot.links?.length;
-                const active = selectedPort?.node === node && selectedPort.input === input && selectedPort.index === index;
-                ctx.strokeStyle = ctx.fillStyle = active ? "#66CCFF" : app.canvas.constructor.link_type_colors[slot.type] || "#aaa";
-                ctx.beginPath();
-                ctx.arc(...point, 4, 0, Math.PI * 2);
-                if (connected) ctx.fill();
-                else ctx.stroke();
-                ctx.save();
-                ctx.beginPath();
-                const labelWidth = Math.max(0, width / 2 - 20);
-                ctx.rect(input ? point[0] + 10 : point[0] - 10 - labelWidth, point[1] - 9, labelWidth, 18);
-                ctx.clip();
-                ctx.textAlign = input ? "left" : "right";
-                ctx.fillStyle = active ? "#66CCFF" : LiteGraph.NODE_TEXT_COLOR;
-                ctx.fillText(slotName(slot), point[0] + (input ? 10 : -10), point[1] + 4);
-                ctx.restore();
-            }
-        }
-        ctx.textAlign = "left";
-        let widgetY = node.pos[1] + 12 + Math.max(node.inputs.filter(slot => !slot.widget).length, node.outputs.length) * LiteGraph.NODE_SLOT_HEIGHT;
-        for (const widget of node.widgets || []) {
-            if (!node.isWidgetVisible(widget)) continue;
-            const rowY = getSetting("Comfy.VueNodes.Enabled", false) ? widgetY : node.pos[1] + widget.y;
-            if (rowY + 20 > y + height) break;
-            ctx.fillStyle = LiteGraph.WIDGET_BGCOLOR;
-            ctx.fillRect(x + 10, rowY, Math.max(0, width - 20), 20);
-            ctx.save();
-            ctx.beginPath();
-            ctx.rect(x + 14, rowY, Math.max(0, width - 28), 20);
-            ctx.clip();
-            ctx.fillStyle = LiteGraph.WIDGET_TEXT_COLOR;
-            ctx.fillText(`${widget.label || widget.name}: ${String(widget.value ?? "")}`, x + 14, rowY + 14);
-            ctx.restore();
-            widgetY += 24;
-        }
-    }
-    if (node.selected || node.mode === 4) {
-        ctx.strokeStyle = node.mode === 4 ? "#FF00FF" : LiteGraph.NODE_BOX_OUTLINE_COLOR;
-        ctx.lineWidth = 2;
-        ctx.strokeRect(x, y, width, height);
-    }
-    ctx.restore();
-}
-
 const menuStyle = `
-.port-connect-menu-overlay { position: fixed; inset: 0; z-index: 10000; }
+.port-connect-menu-grab, .port-connect-menu-grab * { cursor: grab !important; }
+.port-connect-menu-panning, .port-connect-menu-panning * { cursor: grabbing !important; }
+.port-connect-menu-overlay { position: fixed; inset: 0; z-index: 10000; pointer-events: none; }
 .port-connect-menu {
-    position: fixed; box-sizing: border-box; max-width: min(360px, calc(100vw - 16px));
-    max-height: calc(100vh - 16px); display: flex; flex-direction: column;
+    position: fixed; box-sizing: border-box; pointer-events: auto; display: flex; flex-direction: column;
     background: var(--comfy-menu-bg, #252525); color: var(--fg-color, #eee);
     border: 1px solid var(--border-color, #555); border-radius: 8px;
-    box-shadow: 0 6px 24px #0008; padding: 10px; gap: 8px; font: 13px sans-serif;
+    box-shadow: 0 6px 24px #0008; padding: 10px; gap: 8px; font: 12px/14px Arial, sans-serif;
+    max-height: calc(100vh - 16px); max-width: min(360px, calc(100vw - 16px));
 }
 .port-connect-menu-title { overflow-wrap: anywhere; font-weight: bold; }
-.port-connect-menu-preview {
-    position: fixed; box-sizing: border-box; padding: 10px; display: flex; flex-direction: column; gap: 8px;
-    background: var(--comfy-menu-bg, #252525); color: var(--fg-color, #eee); pointer-events: none;
-    border: 1px solid var(--border-color, #555); border-radius: 8px; box-shadow: 0 6px 24px #0008;
-    font: 12px/16px Arial, sans-serif;
-}
-.port-connect-menu-preview[hidden] { display: none; }
-.port-connect-menu-preview-title { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-weight: bold; }
-.port-connect-menu-preview-stage { position: relative; isolation: isolate; overflow: hidden; border-radius: 4px; }
-.port-connect-menu-preview-stage canvas { display: block; width: 100%; height: 100%; }
-.port-connect-menu-preview-world { position: absolute; inset: 0; transform-origin: 0 0; z-index: 1; }
-.port-connect-menu-preview-marker { position: absolute; inset: 0; z-index: 2; }
-.port-connect-menu-preview-status { color: #aaa; white-space: pre-line; max-height: 64px; overflow: hidden; overflow-wrap: anywhere; }
-.port-connect-menu-filter {
-    width: 100%; box-sizing: border-box; padding: 7px 9px; border-radius: 4px;
-    border: 1px solid var(--border-color, #555); background: var(--comfy-input-bg, #171717);
-    color: inherit; flex-shrink: 0;
-}
+.port-connect-menu-filter { width: 100%; box-sizing: border-box; padding: 7px 9px; border-radius: 4px;
+    border: 1px solid var(--border-color, #555); background: var(--comfy-input-bg, #171717); color: inherit; flex-shrink: 0; }
 .port-connect-menu-list { overflow-y: auto; max-height: 55vh; min-height: 0; }
-.port-connect-menu-item {
-    display: grid; grid-template-columns: calc(var(--port-connect-id-width) + 8px) minmax(0, var(--port-connect-name-width)) auto minmax(0, 1fr);
-    column-gap: 4px; font: 12px/14px Arial, sans-serif;
-}
-.port-connect-menu-option {
-    display: grid; grid-template-columns: subgrid; grid-column: 1 / -1; align-items: center;
-    min-width: 0; text-align: left; padding: 6px 8px; border: 0; border-radius: 4px;
-    background: transparent; font: inherit; cursor: pointer; white-space: nowrap;
-}
-.port-connect-menu-option:hover, .port-connect-menu-option:focus-visible { background: #2a60a8; }
-.port-connect-menu-option:disabled { cursor: default; background: transparent; }
-.port-connect-menu-node, .port-connect-menu-port { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.port-connect-menu-id, .port-connect-menu-node, .port-connect-menu-arrow { color: #aaa; }
+.port-connect-menu-item { display: grid; grid-template-columns: calc(var(--port-connect-id-width) + 8px) minmax(0, 1fr);
+    gap: 4px; width: 100%; box-sizing: border-box; text-align: left; padding: 6px 8px; border: 0; border-radius: 4px;
+    background: transparent; font: 12px/14px Arial, sans-serif; cursor: pointer; color: #aaa; }
+.port-connect-menu-item:hover, .port-connect-menu-item:focus-visible { background: #2a60a8; }
 .port-connect-menu-id { font-variant-numeric: tabular-nums; }
-.port-connect-menu-port { grid-column: 4; color: #fff; }
-.port-connect-menu-message { padding: 6px; color: var(--descrip-text, #aaa); }
+.port-connect-menu-node { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.port-connect-menu-message { color: var(--descrip-text, #aaa); line-height: 16px; }
+.port-connect-menu-wire { position: fixed; inset: 0; z-index: 10002; width: 100vw; height: 100vh; pointer-events: none; }
+.port-connect-menu-target { position: fixed; z-index: 9999; pointer-events: none; border: 2px solid #66ccff;
+    border-radius: 8px; box-shadow: 0 0 8px #66ccff88; box-sizing: border-box; }
 `;
 
 export const createPortConnectMenu = (scope) => ({
@@ -129,552 +40,472 @@ export const createPortConnectMenu = (scope) => ({
 
     setup() {
         const canvas = app.canvas;
-        const connector = canvas.linkConnector;
-        let gesture = null;
-        let overlay = null;
-        let stopPreview = null;
-        let repositionMenu = null;
+        let connection = null, pressed = null, pan = null, overlay = null, menu = null;
+        let savedView = null, focusView = null, focus = null, animation = null, frame = null;
+        let positionMenu = null, hoverTimer = null, hoverNode = null, hoverPoint = null;
+        let leaveTimer = null, lastPointer = null, spacePressed = false, spaceHandled = false, suppressContextMenu = false, suppressClick = false;
         const enabled = () => getSetting("PortConnectMenu.Enabled", true);
+        const interactive = (allowPan = false) => enabled() && (!canvas.read_only || allowPan) && !canvas.selectOnly && canvas.allow_interaction
+            && canvas.state.ghostNodeId == null;
         const text = (zh, en) => getSetting("Comfy.Locale", "en").startsWith("zh") ? zh : en;
-        const style = document.createElement("style");
-        style.textContent = menuStyle;
-        document.head.append(style);
-
-        const closeMenu = () => {
-            if (!overlay) return;
-            stopPreview?.();
-            stopPreview = repositionMenu = null;
-            overlay.remove();
-            overlay = null;
-            canvas.canvas.focus();
-        };
-        const finishGesture = () => {
-            if (!gesture) return;
-            const { pointerId } = gesture;
-            gesture = null;
-            connector.reset(true);
-            canvas.setDirty(true, true);
-            if (canvas.canvas.hasPointerCapture(pointerId)) canvas.canvas.releasePointerCapture(pointerId);
-        };
-        const consume = (event) => {
-            event.preventDefault();
-            event.stopImmediatePropagation();
-        };
-        const updatePreview = (event) => {
-            const point = canvas.convertEventToCanvasOffset(event);
-            canvas.graph_mouse[0] = point[0];
-            canvas.graph_mouse[1] = point[1];
-            connector.state.snapLinksPos = point;
-            canvas.setDirty(true, true);
-        };
-        const portAt = (point) => {
-            const graph = canvas.graph;
-            const front = graph.getNodeOnPos(...point);
-            const nodes = front ? [front] : [...canvas.visible_nodes].reverse();
-            for (const node of nodes) {
-                if (node.flags.collapsed) continue;
-                const hit = node.getSlotInPosition(...point);
-                if (hit) return { graph, node, slot: hit.input || hit.output, index: hit.slot, input: !!hit.input };
-            }
-            return null;
-        };
+        const style = document.createElement("style"); style.textContent = menuStyle; document.head.append(style);
+        const wire = document.createElement("canvas"); wire.className = "port-connect-menu-wire";
+        const wireCtx = wire.getContext("2d");
+        const targetGlow = document.createElement("div"); targetGlow.className = "port-connect-menu-target";
+        const consume = event => { event.preventDefault(); event.stopImmediatePropagation(); };
+        const cancelHover = () => { clearTimeout(hoverTimer); hoverTimer = hoverNode = hoverPoint = null; };
+        const cancelLeave = () => { clearTimeout(leaveTimer); leaveTimer = null; };
+        const rememberPointer = event => { lastPointer = { clientX: event.clientX, clientY: event.clientY, ctrlKey: event.ctrlKey, buttons: event.buttons || 0 }; };
+        const validPort = port => port.graph === canvas.graph && port.graph.getNodeById(port.node.id) === port.node
+            && (port.input ? port.node.inputs : port.node.outputs)[port.index] === port.slot;
         const compatible = (from, to) => from.input !== to.input && from.node !== to.node
             && LiteGraph.isValidConnection(from.input ? to.slot.type : from.slot.type, from.input ? from.slot.type : to.slot.type);
+        const nodeElement = node => document.querySelector(`.lg-node[data-node-id="${CSS.escape(String(node.id))}"]`);
+        const boundsOf = node => {
+            const element = getSetting("Comfy.VueNodes.Enabled", false) && nodeElement(node);
+            if (element) {
+                const rect = element.getBoundingClientRect(), main = canvas.canvas.getBoundingClientRect();
+                if (rect.width && rect.height) return [(rect.left - main.left) / canvas.ds.scale - canvas.ds.offset[0],
+                    (rect.top - main.top) / canvas.ds.scale - canvas.ds.offset[1], rect.width / canvas.ds.scale, rect.height / canvas.ds.scale];
+            }
+            return node.getBounding();
+        };
+        const slotPosition = (node, input, index) => {
+            const dot = getSetting("Comfy.VueNodes.Enabled", false) && nodeElement(node)
+                ?.querySelector(`[data-slot-key="${CSS.escape(`${node.id}-${input ? "in" : "out"}-${index}`)}"]`);
+            if (!dot) return input ? node.getInputPos(index) : node.getOutputPos(index);
+            const rect = dot.getBoundingClientRect(), main = canvas.canvas.getBoundingClientRect();
+            return [(rect.left + rect.width / 2 - main.left) / canvas.ds.scale - canvas.ds.offset[0],
+                (rect.top + rect.height / 2 - main.top) / canvas.ds.scale - canvas.ds.offset[1]];
+        };
+        const nodeAt = event => {
+            const element = document.elementFromPoint(event.clientX, event.clientY);
+            if (!element || element.closest(".port-connect-menu-overlay")) return null;
+            const native = element.closest(".lg-node[data-node-id]");
+            if (native) return canvas.graph._nodes.find(node => String(node.id) === native.dataset.nodeId) || null;
+            const node = canvas.graph.getNodeOnPos(...canvas.convertEventToCanvasOffset(event));
+            if (element === canvas.canvas) return node;
+            if (node && ((node.widgets || []).some(widget => widget.element?.contains(element))
+                || Object.values(node).some(value => value instanceof HTMLElement && value.contains(element)))) return node;
+            return null;
+        };
+        const portAt = event => {
+            const element = document.elementFromPoint(event.clientX, event.clientY), node = nodeAt(event);
+            if (!node || node.flags.collapsed) return null;
+            const dot = element?.closest(".lg-slot")?.querySelector("[data-slot-key]");
+            if (dot) {
+                const parts = dot.dataset.slotKey.split("-");
+                const input = parts.at(-2) === "in", index = Number(parts.at(-1));
+                const slot = (input ? node.inputs : node.outputs)[index];
+                if (slot) return { graph: canvas.graph, node, input, index, slot };
+            }
+            const hit = node.getSlotInPosition(...canvas.convertEventToCanvasOffset(event));
+            return hit ? { graph: canvas.graph, node, slot: hit.input || hit.output, index: hit.slot, input: !!hit.input } : null;
+        };
+        const releasePointer = () => {
+            const id = pressed?.pointerId; pressed = null;
+            if (id != null && canvas.canvas.hasPointerCapture(id)) canvas.canvas.releasePointerCapture(id);
+        };
+        const readView = () => ({ graph: canvas.graph, scale: canvas.ds.scale, offset: [...canvas.ds.offset] });
+        const saveView = () => { if (!savedView) savedView = readView(); };
+        const viewArea = () => {
+            const rect = canvas.canvas.getBoundingClientRect();
+            const panel = document.querySelector(".graph-canvas-panel")?.getBoundingClientRect();
+            return panel?.width && panel.height ? { left: Math.max(rect.left, panel.left), top: Math.max(rect.top, panel.top),
+                right: Math.min(rect.right, panel.right, window.innerWidth), bottom: Math.min(rect.bottom, panel.bottom, window.innerHeight) } : rect;
+        };
+        const applyView = (scale, offset) => {
+            canvas.ds.scale = scale; canvas.ds.offset[0] = offset[0]; canvas.ds.offset[1] = offset[1];
+            canvas.setDirty(true, true);
+        };
+        const updateGrabCursor = () => {
+            document.body.classList.toggle("port-connect-menu-grab", !!connection && spacePressed);
+            document.body.classList.toggle("port-connect-menu-panning", !!pan);
+        };
+        const endPan = () => {
+            if (!pan) return;
+            const { pointerId, cursor, dragging } = pan;
+            pan = null;
+            updateGrabCursor();
+            canvas.dragging_canvas = dragging;
+            canvas.canvas.style.cursor = cursor;
+            if (canvas.canvas.hasPointerCapture(pointerId)) canvas.canvas.releasePointerCapture(pointerId);
+        };
+        const beginPan = (event, button) => {
+            // 插件接线没有启动原生 pointer 状态，独立处理抓手，避免 Ctrl＋空格被框选截获。
+            cancelHover(); cancelLeave(); closeMenu();
+            focusView = focus = animation = null; targetGlow.remove();
+            pan = { pointerId: event.pointerId, button, x: event.clientX, y: event.clientY,
+                cursor: canvas.canvas.style.cursor, dragging: canvas.dragging_canvas };
+            pressed = null;
+            updateGrabCursor();
+            canvas.canvas.setPointerCapture(event.pointerId);
+            canvas.dragging_canvas = true;
+            canvas.canvas.style.cursor = "grabbing";
+            canvas.canvas.focus({ preventScroll: true });
+        };
+        const restoreView = (finish = false) => {
+            cancelLeave(); animation = focus = null; targetGlow.remove();
+            const view = finish ? savedView : focusView;
+            if (view?.graph === canvas.graph) applyView(view.scale, view.offset);
+            focusView = null;
+            if (!connection) savedView = null;
+            paintWire();
+        };
+        const closeMenu = () => { menu?.remove(); menu = null; positionMenu = null; };
+        const reset = () => {
+            cancelHover(); endPan(); releasePointer(); connection = null; updateGrabCursor(); restoreView(true); closeMenu();
+            overlay?.remove(); overlay = null; wire.remove();
+            if (frame !== null) cancelAnimationFrame(frame);
+            frame = null; canvas.setDirty(true, true);
+        };
+        const ensureOverlay = () => {
+            if (overlay) return;
+            overlay = document.createElement("div"); overlay.className = "port-connect-menu-overlay"; document.body.append(overlay);
+        };
+        const insideFocus = event => {
+            if (!focus) return false;
+            const [x, y, width, height] = boundsOf(focus.node), rect = canvas.canvas.getBoundingClientRect();
+            const left = rect.left + (x + canvas.ds.offset[0]) * canvas.ds.scale;
+            const top = rect.top + (y + canvas.ds.offset[1]) * canvas.ds.scale;
+            return event.clientX >= left - 18 && event.clientX <= left + width * canvas.ds.scale + 18
+                && event.clientY >= top - 18 && event.clientY <= top + height * canvas.ds.scale + 18;
+        };
+        const paintWire = () => {
+            if (!connection || !lastPointer) return;
+            const dpr = window.devicePixelRatio || 1;
+            const width = Math.round(window.innerWidth * dpr), height = Math.round(window.innerHeight * dpr);
+            if (wire.width !== width || wire.height !== height) { wire.width = width; wire.height = height; }
+            wireCtx.setTransform(1, 0, 0, 1, 0, 0);
+            wireCtx.clearRect(0, 0, width, height);
+            wireCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            const from = connection.from, main = canvas.canvas.getBoundingClientRect();
+            const point = slotPosition(from.node, from.input, from.index);
+            let start = [main.left + (point[0] + canvas.ds.offset[0]) * canvas.ds.scale,
+                main.top + (point[1] + canvas.ds.offset[1]) * canvas.ds.scale];
+            const end = [lastPointer.clientX, lastPointer.clientY];
+            const output = from.input ? end : start, input = from.input ? start : end;
+            const renderer = Object.create(canvas);
+            renderer.ds = { scale: 1 };
+            Object.defineProperty(renderer, "low_quality", { value: false });
+            renderer.render_connection_arrows = false;
+            const color = canvas.constructor.link_type_colors[from.slot.type] || "#66CCFF";
+            renderer.renderLink(wireCtx, output, input, null, false, 0, color, LiteGraph.RIGHT, LiteGraph.LEFT);
+            wireCtx.fillStyle = color;
+            wireCtx.beginPath(); wireCtx.arc(...end, 4, 0, Math.PI * 2); wireCtx.fill();
+            wire.dataset.pointerX = end[0]; wire.dataset.pointerY = end[1];
+        };
         const connectPorts = (from, to) => {
-            if (canvas.graph !== from.graph || from.graph.getNodeById(from.node.id) !== from.node
-                || from.graph.getNodeById(to.node.id) !== to.node
-                || (from.input ? from.node.inputs : from.node.outputs)[from.index] !== from.slot
-                || (to.input ? to.node.inputs : to.node.outputs)[to.index] !== to.slot
-                || !compatible(from, to) || canvas.read_only || !canvas.allow_interaction || !enabled()) return null;
-            const output = from.input ? to : from;
-            const input = from.input ? from : to;
+            if (!interactive() || !validPort(from) || !validPort(to) || !compatible(from, to)) return null;
+            const output = from.input ? to : from, input = from.input ? from : to;
             const existing = from.graph.links[input.slot.link];
             if (existing?.origin_id === output.node.id && existing.origin_slot === output.index) return existing;
             app.extensionManager.workflow.activeWorkflow?.changeTracker.captureCanvasState();
             canvas.emitBeforeChange();
-            try {
-                // 由原生 connect 验证并替换输入旧线，拒绝连接时保留旧线。
-                return output.node.connect(output.index, input.node, input.index);
-            } finally {
-                canvas.emitAfterChange();
-                canvas.setDirty(true, true);
-            }
+            try { return output.node.connect(output.index, input.node, input.index); }
+            finally { canvas.emitAfterChange(); canvas.setDirty(true, true); }
         };
-        const showMenu = (from, event) => {
-            closeMenu();
-            const candidates = [];
-            for (const node of from.graph._nodes) {
-                if (node === from.node) continue;
-                const slots = from.input ? node.outputs : node.inputs;
-                for (const [index, slot] of slots.entries()) {
-                    const to = { node, slot, index, input: !from.input };
-                    if (compatible(from, to)) candidates.push(to);
-                }
+        const paint = time => {
+            frame = null;
+            if (!interactive(!!connection && (spacePressed || !!pan)) || (connection && !validPort(connection.from)) || (savedView && savedView.graph !== canvas.graph)) { reset(); return; }
+            if (focus && canvas.graph.getNodeById(focus.node.id) !== focus.node) restoreView();
+            if (animation) {
+                const t = Math.min(1, (time - animation.started) / 180), eased = 1 - (1 - t) ** 3;
+                const scale = animation.scale + (animation.toScale - animation.scale) * eased;
+                applyView(scale, animation.offset.map((value, i) =>
+                    (value * animation.scale * (1 - eased) + animation.toOffset[i] * animation.toScale * eased) / scale));
+                if (t === 1) animation = null;
             }
-            candidates.sort((a, b) => a.node.title.localeCompare(b.node.title)
-                || String(a.node.id).localeCompare(String(b.node.id), undefined, { numeric: true }) || a.index - b.index);
-            overlay = document.createElement("div");
-            overlay.className = "port-connect-menu-overlay";
-            const menu = document.createElement("div");
-            menu.className = "port-connect-menu";
-            menu.setAttribute("role", "dialog");
-            menu.setAttribute("aria-label", text("端口连接菜单", "Connect Existing Ports"));
-            const title = document.createElement("div");
-            title.className = "port-connect-menu-title";
-            title.textContent = `${from.node.title} #${from.node.id} · ${slotName(from.slot)} (${from.slot.type})`;
-            const filter = document.createElement("input");
-            filter.className = "port-connect-menu-filter";
-            filter.type = "search";
-            filter.placeholder = text("筛选节点或端口…", "Filter nodes or ports…");
-            filter.setAttribute("aria-label", filter.placeholder);
-            const list = document.createElement("div");
-            list.className = "port-connect-menu-list";
-            const idWidth = candidates.reduce((width, to) => Math.max(width, String(to.node.id).length + 1), 2);
+            if (focus) {
+                const [x, y, width, height] = boundsOf(focus.node), rect = canvas.canvas.getBoundingClientRect();
+                Object.assign(targetGlow.style, { left: `${rect.left + (x + canvas.ds.offset[0]) * canvas.ds.scale}px`,
+                    top: `${rect.top + (y + canvas.ds.offset[1]) * canvas.ds.scale}px`,
+                    width: `${width * canvas.ds.scale}px`, height: `${height * canvas.ds.scale}px` });
+                if (!targetGlow.isConnected) document.body.append(targetGlow);
+            }
+            paintWire();
+            if (connection || focus) frame = requestAnimationFrame(paint);
+        };
+        const startPaint = () => { if (frame === null) frame = requestAnimationFrame(paint); };
+        const focusNode = (node, anchor, reason) => {
+            if (!interactive() || canvas.graph.getNodeById(node.id) !== node) return;
+            if (focus?.node === node && focus.reason === reason) { cancelLeave(); return; }
+            cancelLeave(); saveView();
+            if (!focusView) focusView = readView();
+            const rect = canvas.canvas.getBoundingClientRect(), area = viewArea(), [x, y, width, height] = boundsOf(node);
+            const menuRect = menu?.getBoundingClientRect();
+            const left = menuRect ? Math.max(area.left + 16, menuRect.right + 24) : area.left + 24;
+            const right = area.right - 24;
+            const top = Math.max(area.top, 0) + 24, bottom = area.bottom - 24;
+            const scale = Math.max(.1, Math.min(Math.max(1.25, focusView.scale), Math.max(40, right - left) / width));
+            let screenX, screenY;
+            if (menuRect) {
+                screenX = left;
+                screenY = Math.max(top, Math.min(menuRect.top, bottom - height * scale));
+            } else {
+                const point = canvas.convertEventToCanvasOffset(anchor);
+                screenX = anchor.clientX - (point[0] - x) * scale;
+                screenY = anchor.clientY - (point[1] - y) * scale;
+                screenX = Math.max(left, Math.min(screenX, right - width * scale));
+                const anchoredTop = Math.min(top, Math.max(rect.top + 24, screenY));
+                screenY = Math.max(anchoredTop, Math.min(screenY, bottom - Math.min(height * scale, bottom - anchoredTop)));
+            }
+            focus = { node, reason, anchor: { clientX: anchor.clientX, clientY: anchor.clientY }, settled: performance.now() + 250 };
+            animation = { started: performance.now(), scale: canvas.ds.scale, offset: [...canvas.ds.offset], toScale: scale,
+                toOffset: [(screenX - rect.left) / scale - x, (screenY - rect.top) / scale - y] };
+            startPaint();
+        };
+        const confirm = to => {
+            if (!connection || !validPort(to) || !compatible(connection.from, to)) return false;
+            const previousView = readView(), previousFocus = focus, previousFocusView = focusView, previousAnimation = animation;
+            // 在原视图记录撤销状态，避免 Ctrl+Z 跳回临时放大的位置。
+            restoreView(true);
+            if (connectPorts(connection.from, to)) { reset(); canvas.canvas.focus(); return true; }
+            connection.error = text("无法连接：端口已变化，或节点拒绝了连接。", "Unable to connect: ports changed or the node rejected the connection.");
+            const message = menu?.querySelector(".port-connect-menu-message");
+            if (message) message.textContent = connection.error;
+            if (previousView.graph === canvas.graph) {
+                applyView(previousView.scale, previousView.offset);
+                focus = previousFocus; focusView = previousFocusView; animation = previousAnimation;
+                paintWire();
+            }
+            return false;
+        };
+        const begin = (from, event) => {
+            if (!validPort(from)) return;
+            cancelHover(); cancelLeave(); closeMenu(); saveView();
+            connection = { from };
+            updateGrabCursor();
+            rememberPointer(event);
+            pressed = { pointerId: event.pointerId, start: [event.clientX, event.clientY], initial: true };
+            canvas.canvas.setPointerCapture(event.pointerId); document.body.append(wire);
+            paintWire(); startPaint(); canvas.canvas.focus();
+        };
+        const showMenu = event => {
+            cancelHover(); closeMenu(); restoreView(); ensureOverlay();
+            const from = connection.from;
+            const candidates = from.graph._nodes.filter(node => node !== from.node && (from.input ? node.outputs : node.inputs)
+                .some((slot, index) => compatible(from, { node, input: !from.input, index, slot })));
+            candidates.sort((a, b) => a.title.localeCompare(b.title) || String(a.id).localeCompare(String(b.id), undefined, { numeric: true }));
+            menu = document.createElement("div"); menu.className = "port-connect-menu";
+            menu.setAttribute("role", "dialog"); menu.setAttribute("aria-label", text("选择目标节点", "Choose a target node"));
+            const title = document.createElement("div"); title.className = "port-connect-menu-title";
+            title.textContent = `#${from.node.id} ${from.node.title} · ${slotName(from.slot)} (${from.slot.type})`;
+            const filter = document.createElement("input"); filter.type = "search"; filter.className = "port-connect-menu-filter";
+            filter.placeholder = text("筛选节点名称或编号…", "Filter node names or IDs…"); filter.setAttribute("aria-label", filter.placeholder);
+            const list = document.createElement("div"); list.className = "port-connect-menu-list";
+            const idWidth = candidates.reduce((width, node) => Math.max(width, String(node.id).length + 1), 2);
             list.style.setProperty("--port-connect-id-width", `${idWidth}ch`);
-            const message = document.createElement("div");
-            message.className = "port-connect-menu-message";
-            const preview = document.createElement("div");
-            preview.className = "port-connect-menu-preview";
-            preview.hidden = true;
-            const previewTitle = document.createElement("div");
-            previewTitle.className = "port-connect-menu-preview-title";
-            const stage = document.createElement("div");
-            stage.className = "port-connect-menu-preview-stage";
-            const previewCanvas = document.createElement("canvas");
-            const world = document.createElement("div");
-            world.className = "port-connect-menu-preview-world";
-            world.inert = true;
-            const marker = document.createElement("canvas");
-            marker.className = "port-connect-menu-preview-marker";
-            stage.append(previewCanvas, world, marker);
-            const status = document.createElement("div");
-            status.className = "port-connect-menu-preview-status";
-            preview.append(previewTitle, stage, status);
-            const ctx = previewCanvas.getContext("2d");
-            const markerCtx = marker.getContext("2d");
-            let previewPort = null;
-            let previewFrame = null;
-            let lastPaint = 0;
-            let sidePreviewWidth = 0;
-            const snapshots = new Map();
-            const hidePreview = () => {
-                if (previewFrame !== null) cancelAnimationFrame(previewFrame);
-                previewFrame = null;
-                previewPort = null;
-                preview.hidden = true;
-                world.replaceChildren();
-                snapshots.clear();
-            };
-            stopPreview = hidePreview;
-            const measureItems = () => {
-                ctx.font = "12px Arial, sans-serif";
-                const prefixWidth = ctx.measureText("0").width * idWidth + ctx.measureText("▸").width + 28;
-                return [...list.children].map(item => ({
-                    item,
-                    prefixWidth,
-                    nameWidth: ctx.measureText(item.querySelector(".port-connect-menu-node").textContent).width,
-                    portWidth: [...item.querySelectorAll(".port-connect-menu-port")].reduce((width, label) => Math.max(width, ctx.measureText(label.textContent).width), 0)
-                }));
-            };
-            const fitColumns = () => {
-                for (const { item, prefixWidth, nameWidth, portWidth } of measureItems()) {
-                    const available = Math.max(0, list.clientWidth - prefixWidth);
-                    const ratio = Math.min(1, available / Math.max(1, nameWidth + portWidth));
-                    item.style.setProperty("--port-connect-name-width", `${nameWidth * ratio}px`);
-                }
-            };
-            const positionMenu = () => {
-                fitColumns();
+            const message = document.createElement("div"); message.className = "port-connect-menu-message";
+            const anchor = { clientX: event.clientX, clientY: event.clientY };
+            let naturalWidth = 160;
+            positionMenu = () => {
+                const area = viewArea();
+                menu.style.width = `${Math.min(naturalWidth, Math.max(80, area.right - area.left - 160))}px`;
                 const rect = menu.getBoundingClientRect();
-                const remaining = window.innerWidth - rect.width - 24;
-                sidePreviewWidth = remaining >= 200 ? Math.min(320, remaining) : 0;
-                const reserved = sidePreviewWidth ? sidePreviewWidth + 8 : 0;
-                menu.style.left = `${Math.max(8, Math.min(event.clientX, window.innerWidth - rect.width - reserved - 8))}px`;
-                menu.style.top = `${Math.max(8, Math.min(event.clientY, window.innerHeight - rect.height - 8))}px`;
-            };
-            repositionMenu = positionMenu;
-            const paintPreview = (time) => {
-                if (!previewPort) return;
-                if (time - lastPaint < 80) {
-                    previewFrame = requestAnimationFrame(paintPreview);
-                    return;
-                }
-                lastPaint = time;
-                const to = previewPort;
-                if (canvas.graph !== from.graph || from.graph.getNodeById(to.node.id) !== to.node
-                    || (to.input ? to.node.inputs : to.node.outputs)[to.index] !== to.slot) {
-                    hidePreview();
-                    return;
-                }
-                const graph = from.graph;
-                const mainRect = canvas.canvas.getBoundingClientRect();
-                const originals = new Map();
-                if (getSetting("Comfy.VueNodes.Enabled", false)) {
-                    for (const element of document.querySelectorAll(".lg-node[data-node-id]")) originals.set(element.dataset.nodeId, element);
-                }
-                const boundsOf = (node) => {
-                    const element = originals.get(String(node.id));
-                    if (!element) return node.getBounding();
-                    const rect = element.getBoundingClientRect();
-                    return [(rect.left - mainRect.left) / canvas.ds.scale - canvas.ds.offset[0],
-                        (rect.top - mainRect.top) / canvas.ds.scale - canvas.ds.offset[1], rect.width / canvas.ds.scale, rect.height / canvas.ds.scale];
-                };
-                const slotPosition = (node, input, index) => {
-                    const key = `${node.id}-${input ? "in" : "out"}-${index}`;
-                    const dot = originals.get(String(node.id))?.querySelector(`[data-slot-key="${CSS.escape(key)}"]`);
-                    if (!dot) return input ? node.getInputPos(index) : node.getOutputPos(index);
-                    const rect = dot.getBoundingClientRect();
-                    return [(rect.left + rect.width / 2 - mainRect.left) / canvas.ds.scale - canvas.ds.offset[0],
-                        (rect.top + rect.height / 2 - mainRect.top) / canvas.ds.scale - canvas.ds.offset[1]];
-                };
-                const [x, y, nodeWidth, nodeHeight] = boundsOf(to.node);
-                const point = slotPosition(to.node, to.input, to.index);
-                const links = [...graph.links.values()].filter(link => to.input
-                    ? link.target_id === to.node.id && link.target_slot === to.index
-                    : link.origin_id === to.node.id && link.origin_slot === to.index);
-                previewTitle.textContent = `#${to.node.id} ${to.node.title}`;
-                status.textContent = `${slotName(to.slot)} · ${links.length ? text("已有连接", "Connected") : text("未连接", "Not connected")}`;
-                for (const link of links) {
-                    const peer = graph.getNodeById(to.input ? link.origin_id : link.target_id);
-                    if (peer) {
-                        const slot = to.input ? peer.outputs[link.origin_slot] : peer.inputs[link.target_slot];
-                        if (!slot) continue;
-                        status.textContent += `\n${to.input ? "←" : "→"} #${peer.id} ${peer.title} ▸ ${slotName(slot)}`;
-                    } else {
-                        const slot = to.input ? graph.inputNode?.slots[link.origin_slot] : graph.outputNode?.slots[link.target_slot];
-                        if (slot) status.textContent += `\n${to.input ? "←" : "→"} ${to.input ? text("子图输入", "Subgraph input") : text("子图输出", "Subgraph output")} ▸ ${slotName(slot)}`;
-                    }
-                }
-                status.title = status.textContent;
-                preview.dataset.nodeId = to.node.id;
-                preview.dataset.slotIndex = to.index;
-                preview.dataset.direction = to.input ? "input" : "output";
-                const menuRect = menu.getBoundingClientRect();
-                preview.style.width = `${sidePreviewWidth || Math.min(320, window.innerWidth - 16)}px`;
-                const below = window.innerHeight - menuRect.bottom - 16;
-                const above = menuRect.top - 16;
-                const space = sidePreviewWidth ? window.innerHeight - 16 : Math.max(below, above);
-                const previewWidth = preview.clientWidth - 20;
-                const chromeHeight = previewTitle.offsetHeight + status.offsetHeight + 36;
-                const previewHeight = Math.max(40, Math.min(360, space - chromeHeight));
-                const scale = Math.min(1, previewWidth / (nodeWidth + 120), previewHeight / (nodeHeight + 80));
-                const height = Math.max(80, Math.min(previewHeight, (nodeHeight + 80) * scale));
-                stage.style.height = `${height}px`;
-                const originX = x + nodeWidth / 2 - previewWidth / scale / 2;
-                const originY = y + nodeHeight / 2 - height / scale / 2;
-                const dpr = window.devicePixelRatio || 1;
-                for (const image of [previewCanvas, marker]) {
-                    const width = Math.round(previewWidth * dpr);
-                    const bitmapHeight = Math.round(height * dpr);
-                    if (image.width !== width || image.height !== bitmapHeight) {
-                        image.width = width;
-                        image.height = bitmapHeight;
-                    }
-                }
-                ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-                ctx.fillStyle = "#171717";
-                ctx.fillRect(0, 0, previewWidth, height);
-                ctx.setTransform(dpr * scale, 0, 0, dpr * scale, -originX * dpr * scale, -originY * dpr * scale);
-                const nodes = graph._nodes.filter(node => {
-                    const [nx, ny, nw, nh] = boundsOf(node);
-                    return nx < originX + previewWidth / scale && nx + nw > originX
-                        && ny < originY + height / scale && ny + nh > originY;
-                });
-                const renderer = Object.create(canvas);
-                renderer.ds = { scale };
-                Object.defineProperty(renderer, "low_quality", { value: false });
-                renderer.render_connection_arrows = false;
-                for (const link of graph.links.values()) {
-                    const source = graph.getNodeById(link.origin_id);
-                    const target = graph.getNodeById(link.target_id);
-                    const output = source ? source.outputs[link.origin_slot] : graph.inputNode?.slots[link.origin_slot];
-                    const input = target ? target.inputs[link.target_slot] : graph.outputNode?.slots[link.target_slot];
-                    if (!output || !input) continue;
-                    const start = source ? slotPosition(source, false, link.origin_slot) : output.pos;
-                    const end = target ? slotPosition(target, true, link.target_slot) : input.pos;
-                    const reroutes = link.constructor.getReroutes(graph, link);
-                    const points = [start, ...reroutes.map(route => route.pos), end];
-                    const bounds = points.reduce((bounds, point) => [Math.min(bounds[0], point[0]), Math.min(bounds[1], point[1]),
-                        Math.max(bounds[2], point[0]), Math.max(bounds[3], point[1])], [Infinity, Infinity, -Infinity, -Infinity]);
-                    if (bounds[0] > originX + previewWidth / scale + 80 || bounds[2] < originX - 80
-                        || bounds[1] > originY + height / scale + 80 || bounds[3] < originY - 80) continue;
-                    const color = link.color || canvas.constructor.link_type_colors[link.type] || canvas.default_link_color;
-                    let startControl;
-                    for (let i = 1; i < points.length; i++) {
-                        const route = reroutes[i - 1];
-                        // 空 link 只绘制，避免改写原连线的 Path2D 和命中区域。
-                        renderer.renderLink(ctx, points[i - 1], points[i], null, false, 0, color,
-                            i === 1 ? output.dir : LiteGraph.CENTER,
-                            route ? LiteGraph.CENTER : input.dir,
-                            { startControl, endControl: route?.controlPoint });
-                        if (route) {
-                            const next = points[i + 1];
-                            const distance = Math.min(route.constructor.maxSplineOffset, Math.hypot(route.pos[0] - next[0], route.pos[1] - next[1]) * 0.25);
-                            startControl = [distance * route.cos, distance * route.sin];
-                        }
-                    }
-                }
-                for (const node of nodes.filter(node => node !== to.node)) drawPreviewNode(ctx, node, to);
-                drawPreviewNode(ctx, to.node, to);
-                // 已在视野内的画布使用当前像素；视野外节点按实时图数据绘制。
-                ctx.drawImage(canvas.canvas, -canvas.ds.offset[0], -canvas.ds.offset[1], mainRect.width / canvas.ds.scale, mainRect.height / canvas.ds.scale);
-                world.style.transform = `scale(${scale}) translate(${-originX}px, ${-originY}px)`;
-                const visible = new Set();
-                if (getSetting("Comfy.VueNodes.Enabled", false)) {
-                    for (const node of nodes) {
-                        const original = originals.get(String(node.id));
-                        if (!original) continue;
-                        visible.add(node);
-                        const html = original.outerHTML;
-                        let snapshot = snapshots.get(node);
-                        if (!snapshot || snapshot.html !== html) {
-                            snapshot?.clone.remove();
-                            const clone = original.cloneNode(true);
-                            clone.classList.remove("lg-node");
-                            clone.dataset.previewNodeId = node.id;
-                            const imageCanvases = [...clone.querySelectorAll("canvas")];
-                            const videoCanvases = [...clone.querySelectorAll("video")].map(video => {
-                                const image = document.createElement("canvas");
-                                image.className = video.className;
-                                image.style.cssText = video.style.cssText;
-                                video.replaceWith(image);
-                                return image;
-                            });
-                            for (const audio of clone.querySelectorAll("audio")) {
-                                audio.removeAttribute("autoplay");
-                                audio.removeAttribute("src");
-                                audio.querySelectorAll("source").forEach(source => source.remove());
-                            }
-                            for (const frame of clone.querySelectorAll("iframe")) {
-                                const placeholder = document.createElement("div");
-                                placeholder.className = frame.className;
-                                placeholder.style.cssText = frame.style.cssText;
-                                placeholder.textContent = text("自定义控件", "Custom widget");
-                                frame.replaceWith(placeholder);
-                            }
-                            const ids = new Map();
-                            for (const element of clone.querySelectorAll("svg [id]")) {
-                                const id = element.id;
-                                const renamed = `port-connect-preview-${node.id}-${id}`;
-                                ids.set(id, renamed);
-                                element.id = renamed;
-                            }
-                            for (const element of clone.querySelectorAll("svg, svg *")) {
-                                for (const attr of [...element.attributes]) {
-                                    if (attr.name === "id") continue;
-                                    for (const [id, renamed] of ids) {
-                                        if (attr.value === `#${id}`) element.setAttribute(attr.name, `#${renamed}`);
-                                        else if (attr.value.includes(`url(#${id})`)) element.setAttribute(attr.name, attr.value.replaceAll(`url(#${id})`, `url(#${renamed})`));
-                                    }
-                                }
-                            }
-                            if (node === to.node) {
-                                const dot = clone.querySelector(`[data-slot-key="${CSS.escape(`${node.id}-${to.input ? "in" : "out"}-${to.index}`)}"]`);
-                                const slot = dot?.closest(".lg-slot");
-                                if (slot) {
-                                    slot.style.background = "#66CCFF22";
-                                    for (const label of slot.querySelectorAll("span")) label.style.color = "#66CCFF";
-                                }
-                            }
-                            for (const element of [clone, ...clone.querySelectorAll("[id], [data-node-id], [data-slot-key], [autofocus]")]) {
-                                if (element.namespaceURI !== "http://www.w3.org/2000/svg") element.removeAttribute("id");
-                                element.removeAttribute("data-node-id");
-                                element.removeAttribute("data-slot-key");
-                                element.removeAttribute("autofocus");
-                            }
-                            clone.inert = true;
-                            world.append(clone);
-                            snapshot = { clone, html, imageCanvases, videoCanvases };
-                            snapshots.set(node, snapshot);
-                        }
-                        const controls = snapshot.clone.querySelectorAll("input, textarea, select");
-                        original.querySelectorAll("input, textarea, select").forEach((control, i) => {
-                            if (!(control instanceof HTMLInputElement) || control.type !== "file") controls[i].value = control.value;
-                            if (control instanceof HTMLInputElement) controls[i].checked = control.checked;
-                        });
-                        original.querySelectorAll("canvas").forEach((image, i) => {
-                            if (!image.width || !image.height) return;
-                            const copy = snapshot.imageCanvases[i];
-                            copy.width = image.width;
-                            copy.height = image.height;
-                            copy.getContext("2d").drawImage(image, 0, 0);
-                        });
-                        original.querySelectorAll("video").forEach((video, i) => {
-                            const copy = snapshot.videoCanvases[i];
-                            if (video.readyState < 2) return;
-                            copy.width = video.videoWidth;
-                            copy.height = video.videoHeight;
-                            copy.getContext("2d").drawImage(video, 0, 0);
-                        });
-                    }
-                }
-                for (const [node, snapshot] of snapshots) {
-                    if (!visible.has(node)) { snapshot.clone.remove(); snapshots.delete(node); }
-                }
-                markerCtx.setTransform(1, 0, 0, 1, 0, 0);
-                markerCtx.clearRect(0, 0, marker.width, marker.height);
-                markerCtx.setTransform(dpr * scale, 0, 0, dpr * scale, -originX * dpr * scale, -originY * dpr * scale);
-                markerCtx.strokeStyle = markerCtx.shadowColor = "#66CCFF";
-                markerCtx.lineWidth = 2 / scale;
-                markerCtx.shadowBlur = 8 * dpr;
-                markerCtx.beginPath();
-                markerCtx.arc(...point, 7 / scale, 0, Math.PI * 2);
-                markerCtx.stroke();
-                const previewRect = preview.getBoundingClientRect();
-                preview.style.left = `${sidePreviewWidth ? menuRect.right + 8 : Math.min(menuRect.left, window.innerWidth - previewRect.width - 8)}px`;
-                const top = sidePreviewWidth ? menuRect.top : below >= above ? menuRect.bottom + 8 : menuRect.top - previewRect.height - 8;
-                preview.style.top = `${Math.max(8, Math.min(top, window.innerHeight - previewRect.height - 8))}px`;
-                previewFrame = requestAnimationFrame(paintPreview);
-            };
-            const showPreview = (to) => {
-                hidePreview();
-                previewPort = to;
-                preview.hidden = false;
-                lastPaint = -Infinity;
-                paintPreview(performance.now());
+                const remaining = area.right - area.left - rect.width - 48;
+                const reserved = Math.max(0, Math.min(420, remaining));
+                Object.assign(menu.style, { left: `${Math.max(8, area.left + 8, Math.min(anchor.clientX, area.right - rect.width - reserved - 8))}px`,
+                    top: `${Math.max(8, area.top + 8, Math.min(anchor.clientY, area.bottom - rect.height - 8))}px` });
             };
             const render = () => {
-                hidePreview();
-                list.replaceChildren();
+                cancelHover(); restoreView(); list.replaceChildren();
                 const query = filter.value.trim().toLocaleLowerCase();
-                const matches = candidates.filter(to => `${to.node.title} #${to.node.id} ${slotName(to.slot)} ${to.slot.name} ${to.slot.type}`.toLocaleLowerCase().includes(query));
-                const groups = new Map();
-                for (const to of matches) {
-                    if (!groups.has(to.node)) groups.set(to.node, []);
-                    groups.get(to.node).push(to);
+                const matches = candidates.filter(node => from.graph.getNodeById(node.id) === node && `${node.title} #${node.id}`.toLocaleLowerCase().includes(query));
+                for (const node of matches) {
+                    const button = document.createElement("button"); button.type = "button"; button.className = "port-connect-menu-item";
+                    button.dataset.nodeId = node.id; button.title = `#${node.id} ${node.title}`;
+                    const id = document.createElement("span"); id.className = "port-connect-menu-id"; id.textContent = `#${node.id}`;
+                    const name = document.createElement("span"); name.className = "port-connect-menu-node"; name.textContent = node.title;
+                    button.append(id, name);
+                    const open = () => scheduleFocus(node, lastPointer || anchor, "menu");
+                    button.addEventListener("pointerenter", open); button.addEventListener("focus", open);
+                    button.addEventListener("pointerleave", () => { if (hoverNode === node) cancelHover(); });
+                    button.addEventListener("click", () => { cancelHover(); focusNode(node, lastPointer || anchor, "menu"); });
+                    list.append(button);
                 }
-                for (const [node, ports] of groups) {
-                    const item = document.createElement("div");
-                    item.className = "port-connect-menu-item";
-                    item.setAttribute("role", "group");
-                    item.setAttribute("aria-label", `#${node.id} ${node.title}`);
-                    for (const to of ports) {
-                        const button = document.createElement("button");
-                        button.type = "button";
-                        button.className = "port-connect-menu-option";
-                        if (to === ports[0]) {
-                            const id = document.createElement("span");
-                            id.className = "port-connect-menu-id";
-                            id.textContent = `#${node.id}`;
-                            const nodeLabel = document.createElement("span");
-                            nodeLabel.className = "port-connect-menu-node";
-                            nodeLabel.textContent = node.title;
-                            const arrow = document.createElement("span");
-                            arrow.className = "port-connect-menu-arrow";
-                            arrow.textContent = "▸";
-                            button.append(id, nodeLabel, arrow);
-                        }
-                        const portLabel = document.createElement("span");
-                        portLabel.className = "port-connect-menu-port";
-                        const input = from.input ? from : to;
-                        const output = from.input ? to : from;
-                        const oldLink = from.graph.links[input.slot.link];
-                        const same = oldLink?.origin_id === output.node.id && oldLink.origin_slot === output.index;
-                        portLabel.textContent = slotName(to.slot);
-                        if (oldLink) portLabel.textContent += text("（已有连接）", " (Already connected)");
-                        button.disabled = same;
-                        button.append(portLabel);
-                        button.title = `#${node.id} ${node.title} ▸ ${portLabel.textContent}`;
-                        button.setAttribute("aria-label", button.title);
-                        button.addEventListener("pointerenter", () => showPreview(to));
-                        button.addEventListener("pointerleave", hidePreview);
-                        button.addEventListener("focus", () => showPreview(to));
-                        button.addEventListener("blur", hidePreview);
-                        button.addEventListener("click", () => {
-                            if (connectPorts(from, to)) closeMenu();
-                            else {
-                                message.textContent = text("无法连接：节点或端口已变化，或节点拒绝了连接。", "Unable to connect: ports changed or the node rejected the connection.");
-                                positionMenu();
-                            }
-                        });
-                        item.append(button);
-                    }
-                    list.append(item);
-                }
-                message.textContent = matches.length ? "" : candidates.length
-                    ? text("没有符合筛选条件的端口。", "No ports match this filter.")
-                    : text("当前画布没有兼容端口。", "No compatible ports on the current canvas.");
+                message.textContent = matches.length ? "" : text("没有兼容或符合筛选条件的节点。", "No compatible nodes match this filter.");
                 if (!menu.style.width) {
-                    const width = measureItems().reduce((width, item) => Math.max(width, item.prefixWidth + item.nameWidth + item.portWidth + 22), 160);
-                    menu.style.width = `${Math.ceil(Math.min(360, width))}px`;
+                    wireCtx.font = "12px Arial, sans-serif";
+                    const width = candidates.reduce((width, node) => Math.max(width, wireCtx.measureText("0").width * idWidth + wireCtx.measureText(node.title).width + 42), 160);
+                    naturalWidth = Math.ceil(Math.min(360, width));
                 }
                 positionMenu();
             };
             filter.addEventListener("input", render);
-            menu.addEventListener("keydown", event => {
-                if (event.key === "Enter" && event.target === filter) {
-                    event.preventDefault();
-                    list.querySelector("button:not(:disabled)")?.click();
+            filter.addEventListener("keydown", event => {
+                if (event.key === "Enter") { consume(event); list.querySelector("button")?.focus(); }
+            });
+            menu.append(title, filter, list, message); overlay.append(menu); render(); filter.focus();
+        };
+        const scheduleFocus = (node, event, reason) => {
+            if (reason === "direct") { cancelHover(); focusNode(node, event, reason); return; }
+            if (focus?.node === node && focus.reason === reason) { cancelHover(); cancelLeave(); return; }
+            if (hoverNode === node) { hoverPoint = { clientX: event.clientX, clientY: event.clientY }; return; }
+            cancelHover(); hoverNode = node; hoverPoint = { clientX: event.clientX, clientY: event.clientY };
+            hoverTimer = setTimeout(() => {
+                const anchor = hoverPoint; cancelHover();
+                if (interactive() && node.graph === canvas.graph && (connection || lastPointer?.ctrlKey)) focusNode(node, anchor, reason);
+            }, 200);
+        };
+        const scheduleRestore = () => {
+            if (leaveTimer !== null) return;
+            leaveTimer = setTimeout(() => {
+                leaveTimer = null;
+                if (focus && focus.reason !== "menu" && lastPointer && !insideFocus(lastPointer)) {
+                    cancelHover(); restoreView();
+                    updatePointer(lastPointer);
                 }
-            });
-            overlay.addEventListener("pointerdown", event => {
-                if (event.target === overlay) closeMenu();
-                event.stopPropagation();
-            });
-            menu.append(title, filter, list, message);
-            overlay.append(menu, preview);
-            document.body.append(overlay);
-            render();
-            filter.focus();
+            }, Math.max(160, (focus?.settled || 0) - performance.now()));
+        };
+        const updatePointer = event => {
+            rememberPointer(event);
+            if (connection && !validPort(connection.from)) { reset(); return; }
+            if (connection) paintWire();
+            if (pan || spacePressed || canvas.dragging_canvas) { cancelHover(); cancelLeave(); return; }
+            if (connection && focus?.reason === "direct" && !event.ctrlKey) restoreView();
+            const element = document.elementFromPoint(event.clientX, event.clientY);
+            if (element?.closest(".port-connect-menu-overlay")) {
+                if (hoverNode && element.closest(".port-connect-menu-item")?.dataset.nodeId !== String(hoverNode.id)) cancelHover();
+                cancelLeave(); return;
+            }
+            const node = nodeAt(event);
+            if (connection && document.activeElement?.closest(".port-connect-menu-overlay")) canvas.canvas.focus({ preventScroll: true });
+            if (focus) {
+                if (insideFocus(event) && (!connection || !node || node === focus.node)) { cancelLeave(); cancelHover(); return; }
+                if (connection && node && event.ctrlKey && !(event.buttons & ~1)) cancelLeave();
+                else if (focus.reason === "menu") { cancelHover(); return; }
+                else if (connection || !event.ctrlKey) scheduleRestore();
+            }
+            const canTarget = node && connection && event.ctrlKey && !(event.buttons & ~1) && !event.shiftKey && !event.altKey && !event.metaKey;
+            const canSource = node && !connection && event.ctrlKey && !event.buttons && !event.shiftKey && !event.altKey && !event.metaKey
+                && !isEditing(element) && !canvas.linkConnector.isConnecting;
+            if (interactive() && (canTarget || (!menu && canSource))) scheduleFocus(node, event, connection ? "direct" : "source");
+            else cancelHover();
         };
 
         scope.listen(window, "pointerdown", event => {
-            if (overlay && !overlay.contains(event.target)) closeMenu();
-            if (gesture) finishGesture();
-            if (!enabled() || event.button !== 0 || !event.ctrlKey || event.shiftKey || event.altKey || event.metaKey
-                || isEditing(event.target) || canvas.read_only || canvas.selectOnly || !canvas.allow_interaction
-                || canvas.state.ghostNodeId != null || connector.isConnecting) return;
-            if (event.target !== canvas.canvas && !event.target.closest?.(".lg-slot")) return;
-            const from = portAt(canvas.convertEventToCanvasOffset(event));
-            if (!from) return;
-            consume(event);
-            canvas.canvas.focus();
-            gesture = { from, pointerId: event.pointerId, start: [event.clientX, event.clientY] };
-            // 始终新建拖动预览，输入端口已有连接也不进入移动旧线模式。
-            if (from.input) connector.dragNewFromInput(from.graph, from.node, from.slot);
-            else connector.dragNewFromOutput(from.graph, from.node, from.slot);
-            updatePreview(event);
-            canvas.canvas.setPointerCapture(event.pointerId);
-        }, true);
-        scope.listen(window, "pointermove", event => {
-            if (!gesture || event.pointerId !== gesture.pointerId) return;
-            consume(event);
-            if (!(event.buttons & 1) || !event.ctrlKey || gesture.from.graph !== canvas.graph) {
-                finishGesture();
+            rememberPointer(event);
+            cancelHover();
+            suppressClick = false;
+            if (event.button === 2 && (connection || focus)) { consume(event); suppressContextMenu = true; reset(); return; }
+            if (connection && (event.button === 1 || (event.button === 0 && spacePressed))) {
+                consume(event); beginPan(event, event.button); updatePointer(event); return;
+            }
+            if (event.button !== 0) return;
+            if (connection) {
+                if (event.target.closest?.(".port-connect-menu")) return;
+                if (!nodeAt(event) && event.target !== canvas.canvas && !insideFocus(event)) { reset(); return; }
+                consume(event); pressed = { pointerId: event.pointerId, initial: false };
+                canvas.canvas.setPointerCapture(event.pointerId); updatePointer(event); return;
+            }
+            const from = portAt(event);
+            if (!from || !interactive() || canvas.linkConnector.isConnecting || event.shiftKey || event.altKey || event.metaKey
+                || !event.ctrlKey || isEditing(event.target)) {
+                if (focus && insideFocus(event) && !spacePressed) { suppressClick = true; consume(event); }
+                else if (focus) { cancelHover(); restoreView(); }
                 return;
             }
-            updatePreview(event);
+            consume(event); begin(from, event);
+        }, true);
+        scope.listen(window, "pointermove", event => {
+            // 左键已按住时再按中键只会产生 pointermove，不会再产生 pointerdown。
+            if (connection && !pan && ((event.buttons & 4) || (spacePressed && (event.buttons & 1)))) {
+                beginPan(event, event.buttons & 4 ? 1 : 0);
+            }
+            if (pan) {
+                if (event.pointerId !== pan.pointerId) return;
+                consume(event);
+                const held = event.buttons & (pan.button === 1 ? 4 : 1);
+                if (held) {
+                    applyView(canvas.ds.scale, [canvas.ds.offset[0] + (event.clientX - pan.x) / canvas.ds.scale,
+                        canvas.ds.offset[1] + (event.clientY - pan.y) / canvas.ds.scale]);
+                    pan.x = event.clientX; pan.y = event.clientY;
+                } else endPan();
+                updatePointer(event); return;
+            }
+            if (pressed && event.pointerId !== pressed.pointerId) return;
+            if (connection && !(event.buttons & 4) && !spacePressed && !canvas.dragging_canvas
+                && !event.target.closest?.(".port-connect-menu")) event.stopImmediatePropagation();
+            updatePointer(event);
         }, true);
         scope.listen(window, "pointerup", event => {
-            if (!gesture || event.pointerId !== gesture.pointerId) return;
+            rememberPointer(event);
+            if (pan && event.pointerId === pan.pointerId) {
+                consume(event); suppressClick = true;
+                endPan(); paintWire(); return;
+            }
+            if (connection && !pressed && event.button === 0 && !event.target.closest?.(".port-connect-menu")) {
+                consume(event); suppressClick = true; return;
+            }
+            if (!connection || !pressed || event.pointerId !== pressed.pointerId || event.button !== 0) return;
+            suppressClick = true;
             consume(event);
-            const { from, start } = gesture;
-            const point = canvas.convertEventToCanvasOffset(event);
-            const to = portAt(point);
-            finishGesture();
-            if (!event.ctrlKey || !enabled() || from.graph !== canvas.graph
-                || Math.hypot(event.clientX - start[0], event.clientY - start[1]) < 6) return;
-            if (to && compatible(from, to)) connectPorts(from, to);
-            else showMenu(from, event);
+            const wasInitial = pressed.initial, start = pressed.start, to = portAt(event);
+            releasePointer(); updatePointer(event);
+            if (!connection) return;
+            if (to && compatible(connection.from, to)) { confirm(to); return; }
+            if (to?.node === connection.from.node && wasInitial && start && Math.hypot(event.clientX - start[0], event.clientY - start[1]) < 6) return;
+            const node = nodeAt(event);
+            if (node) {
+                cancelHover();
+            } else if (!document.elementFromPoint(event.clientX, event.clientY)?.closest(".port-connect-menu-overlay") && !insideFocus(event)) {
+                showMenu(event);
+            }
+        }, true);
+        scope.listen(window, "click", event => {
+            if (suppressClick || (connection && !event.target.closest?.(".port-connect-menu"))) consume(event);
+            suppressClick = false;
         }, true);
         scope.listen(window, "keydown", event => {
-            if (event.key !== "Escape" || (!gesture && !overlay)) return;
-            consume(event);
-            finishGesture();
-            closeMenu();
+            if (event.key === " " && !isEditing(event.target)) {
+                spacePressed = true;
+                if (connection) {
+                    spaceHandled = true; consume(event); cancelHover(); cancelLeave();
+                    if (pressed && !pan) beginPan({ ...lastPointer, pointerId: pressed.pointerId }, 0);
+                }
+                updateGrabCursor();
+            }
+            if (event.key === "Escape" && (connection || focus || menu || hoverTimer)) { consume(event); reset(); }
+            if (event.key === "Control" && !isEditing(event.target) && lastPointer) updatePointer({ ...lastPointer, ctrlKey: true,
+                shiftKey: event.shiftKey, altKey: event.altKey, metaKey: event.metaKey });
         }, true);
         scope.listen(window, "keyup", event => {
-            if (event.key === "Control" && !event.ctrlKey) finishGesture();
+            if (event.key === " ") {
+                spacePressed = false;
+                if (pan?.button === 0) endPan();
+                updateGrabCursor();
+                if (spaceHandled) { consume(event); spaceHandled = false; }
+            }
+            if (event.key !== "Control") return;
+            if (lastPointer) lastPointer.ctrlKey = false;
+            cancelHover();
+            if (!connection) reset();
+            else if (focus?.reason === "source" || focus?.reason === "direct") restoreView();
         }, true);
-        const reset = () => { finishGesture(); closeMenu(); };
-        for (const name of ["pointercancel", "subgraph-opening", "litegraph:set-graph"]) {
-            scope.listen(canvas.canvas, name, reset);
-        }
-        scope.listen(canvas.canvas, "lostpointercapture", event => {
-            if (gesture?.pointerId === event.pointerId) finishGesture();
+        scope.listen(window, "contextmenu", event => {
+            if (suppressContextMenu) { consume(event); suppressContextMenu = false; }
+        }, true);
+        scope.listen(window, "wheel", event => {
+            cancelHover();
+            if (!event.target.closest?.(".port-connect-menu")) {
+                animation = null;
+                if (connection) { cancelLeave(); focusView = focus = null; targetGlow.remove(); }
+                else if (focus) focus.settled = performance.now() + 250;
+            }
+            requestAnimationFrame(paintWire);
+        }, { passive: true, capture: true });
+        scope.listen(window, "resize", () => {
+            positionMenu?.();
+            if (focus) { const previous = focus; focus = null; focusNode(previous.node, previous.anchor, previous.reason); }
+            paintWire();
         });
-        scope.listen(window, "blur", reset);
-        scope.listen(window, "resize", () => repositionMenu?.());
+        scope.listen(canvas.canvas, "lostpointercapture", event => {
+            if (pressed?.pointerId === event.pointerId || pan?.pointerId === event.pointerId) reset();
+        });
+        scope.listen(window, "pointercancel", reset);
+        for (const name of ["subgraph-opening", "litegraph:set-graph"]) scope.listen(canvas.canvas, name, reset);
+        scope.listen(window, "blur", () => { reset(); lastPointer = null; spacePressed = spaceHandled = false; });
         scope.listen(app.ui.settings, "PortConnectMenu.Enabled.change", reset);
         scope.add(() => { reset(); style.remove(); });
     }

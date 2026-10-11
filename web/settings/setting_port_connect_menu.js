@@ -8,6 +8,6 @@ app.registerExtension({
         type: "boolean",
         defaultValue: true,
         category: ["AlignLayout", "PortConnectMenu", "Enable Feature"],
-        tooltip: "Ctrl + left drag from an input or output port, then release to list compatible ports on the current canvas. Select to connect; cancel to keep existing links."
+        tooltip: "Ctrl + hover temporarily zooms the main view to a source node; release Ctrl to restore. Ctrl + drag to a target zooms it until you leave, connect or cancel. Menu hover places the target to the right of the fixed menu. Release or click a compatible port to connect; Esc cancels and restores the original view."
     }]
 });
