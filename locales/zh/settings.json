@@ -20,8 +20,44 @@
         "tooltip": "多次按键切换接口/节点功能的超时时间。超时后再次按键将视为新的操作。"
     },
     "PortConnectMenu_Enabled": {
-        "name": "启用端口连接菜单",
+        "name": "启用连接助手",
         "tooltip": "Ctrl 悬停起始节点，临时放大主视图，松开 Ctrl 恢复；Ctrl 从端口拖到目标节点，放大后在真实端口连接，移出目标恢复。悬停菜单选项时定位目标到固定菜单右边。连接完成或 Esc 取消后恢复原视图。"
+    },
+    "PortConnectMenu_SourceHoverZoom": {
+        "name": "接线前悬停放大",
+        "tooltip": "接线前按住 Ctrl 悬停节点，临时放大主视图；松开 Ctrl 恢复。关闭后仍可从端口拖线，也不影响菜单选项的定位放大。"
+    },
+    "PortConnectMenu_TargetHoverZoom": {
+        "name": "拖线时悬停放大",
+        "tooltip": "待连接时按住 Ctrl 悬停任意节点，立即定位放大。关闭后仍可正常接线，也不影响菜单选项的定位放大。"
+    },
+    "PortConnectMenu_PreviewZoom": {
+        "name": "预览缩放比例（%）",
+        "tooltip": "查看节点时的画布缩放比例，默认 125%。原视图更大时保持原缩放；横向空间不足时自动限制。这是画布缩放百分比，不是在当前缩放上乘以该比例。"
+    },
+    "PortConnectMenu_AnimationDuration": {
+        "name": "定位动画时长（毫秒）",
+        "tooltip": "定位时平移和缩放的动画时长，默认 180 毫秒；设为 0 时立即定位。"
+    },
+    "PortConnectMenu_HighlightColor": {
+        "name": "节点高亮颜色",
+        "tooltip": "当前查看节点的边框和发光颜色，例如 #66CCFF。"
+    },
+    "PortConnectMenu_GlowStrength": {
+        "name": "节点发光强度",
+        "tooltip": "当前查看节点的外发光模糊半径，范围 0～50；设为 0 时只保留高亮边框。"
+    },
+    "PortConnectMenu_HoverDelay": {
+        "name": "悬停等待时间（毫秒）",
+        "tooltip": "接线前悬停节点和悬停菜单选项的等待时间，默认 200 毫秒；待连接时 Ctrl 悬停节点仍立即定位，不受此设置影响。"
+    },
+    "PortConnectMenu_MenuMaxWidth": {
+        "name": "菜单最大宽度（像素）",
+        "tooltip": "节点菜单的最大宽度，默认 360 像素。仍按内容自适应，窄视图自动缩小，过长名称显示省略号。"
+    },
+    "PortConnectMenu_MenuFontSize": {
+        "name": "菜单字体大小（像素）",
+        "tooltip": "节点菜单的字体大小，默认 12 像素；行高和内容宽度随字体调整，节点编号保持等宽对齐。"
     },
     "LinkCut_Enabled": {
         "name": "启用划线断开",

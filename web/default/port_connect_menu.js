@@ -16,8 +16,9 @@ const menuStyle = `
     position: fixed; box-sizing: border-box; pointer-events: auto; display: flex; flex-direction: column;
     background: var(--comfy-menu-bg, #252525); color: var(--fg-color, #eee);
     border: 1px solid var(--border-color, #555); border-radius: 8px;
-    box-shadow: 0 6px 24px #0008; padding: 10px; gap: 8px; font: 12px/14px Arial, sans-serif;
-    max-height: calc(100vh - 16px); max-width: min(360px, calc(100vw - 16px));
+    box-shadow: 0 6px 24px #0008; padding: 10px; gap: 8px;
+    font: var(--port-connect-font-size, 12px)/var(--port-connect-line-height, 14px) Arial, sans-serif;
+    max-height: calc(100vh - 16px); max-width: min(var(--port-connect-max-width, 360px), calc(100vw - 16px));
 }
 .port-connect-menu-title { overflow-wrap: anywhere; font-weight: bold; }
 .port-connect-menu-filter { width: 100%; box-sizing: border-box; padding: 7px 9px; border-radius: 4px;
@@ -25,7 +26,7 @@ const menuStyle = `
 .port-connect-menu-list { overflow-y: auto; max-height: 55vh; min-height: 0; }
 .port-connect-menu-item { display: grid; grid-template-columns: calc(var(--port-connect-id-width) + 8px) minmax(0, 1fr);
     gap: 4px; width: 100%; box-sizing: border-box; text-align: left; padding: 6px 8px; border: 0; border-radius: 4px;
-    background: transparent; font: 12px/14px Arial, sans-serif; cursor: pointer; color: #aaa; }
+    background: transparent; font: inherit; cursor: pointer; color: #aaa; }
 .port-connect-menu-item:hover, .port-connect-menu-item:focus-visible { background: #2a60a8; }
 .port-connect-menu-id { font-variant-numeric: tabular-nums; }
 .port-connect-menu-node { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
@@ -42,9 +43,11 @@ export const createPortConnectMenu = (scope) => ({
         const canvas = app.canvas;
         let connection = null, pressed = null, pan = null, overlay = null, menu = null;
         let savedView = null, focusView = null, focus = null, animation = null, frame = null;
-        let positionMenu = null, hoverTimer = null, hoverNode = null, hoverPoint = null;
+        let positionMenu = null, updateMenuStyle = null, hoverTimer = null, hoverNode = null, hoverPoint = null;
         let leaveTimer = null, lastPointer = null, spacePressed = false, spaceHandled = false, suppressContextMenu = false, suppressClick = false;
         const enabled = () => getSetting("PortConnectMenu.Enabled", true);
+        const sourceHoverZoom = () => getSetting("PortConnectMenu.SourceHoverZoom", true);
+        const targetHoverZoom = () => getSetting("PortConnectMenu.TargetHoverZoom", true);
         const interactive = (allowPan = false) => enabled() && (!canvas.read_only || allowPan) && !canvas.selectOnly && canvas.allow_interaction
             && canvas.state.ghostNodeId == null;
         const text = (zh, en) => getSetting("Comfy.Locale", "en").startsWith("zh") ? zh : en;
@@ -52,6 +55,14 @@ export const createPortConnectMenu = (scope) => ({
         const wire = document.createElement("canvas"); wire.className = "port-connect-menu-wire";
         const wireCtx = wire.getContext("2d");
         const targetGlow = document.createElement("div"); targetGlow.className = "port-connect-menu-target";
+        const updateGlow = () => {
+            const value = getSetting("PortConnectMenu.HighlightColor", "#66CCFF");
+            const color = CSS.supports("color", value) ? value : "#66CCFF";
+            const strength = getSetting("PortConnectMenu.GlowStrength", 8);
+            targetGlow.style.borderColor = color;
+            targetGlow.style.boxShadow = strength ? `0 0 ${strength}px color-mix(in srgb, ${color} 53.3333%, transparent)` : "none";
+        };
+        updateGlow();
         const consume = event => { event.preventDefault(); event.stopImmediatePropagation(); };
         const cancelHover = () => { clearTimeout(hoverTimer); hoverTimer = hoverNode = hoverPoint = null; };
         const cancelLeave = () => { clearTimeout(leaveTimer); leaveTimer = null; };
@@ -152,7 +163,7 @@ export const createPortConnectMenu = (scope) => ({
             if (!connection) savedView = null;
             paintWire();
         };
-        const closeMenu = () => { menu?.remove(); menu = null; positionMenu = null; };
+        const closeMenu = () => { menu?.remove(); menu = null; positionMenu = updateMenuStyle = null; };
         const reset = () => {
             cancelHover(); endPan(); releasePointer(); connection = null; updateGrabCursor(); restoreView(true); closeMenu();
             overlay?.remove(); overlay = null; wire.remove();
@@ -210,7 +221,7 @@ export const createPortConnectMenu = (scope) => ({
             if (!interactive(!!connection && (spacePressed || !!pan)) || (connection && !validPort(connection.from)) || (savedView && savedView.graph !== canvas.graph)) { reset(); return; }
             if (focus && canvas.graph.getNodeById(focus.node.id) !== focus.node) restoreView();
             if (animation) {
-                const t = Math.min(1, (time - animation.started) / 180), eased = 1 - (1 - t) ** 3;
+                const t = Math.min(1, (time - animation.started) / animation.duration), eased = 1 - (1 - t) ** 3;
                 const scale = animation.scale + (animation.toScale - animation.scale) * eased;
                 applyView(scale, animation.offset.map((value, i) =>
                     (value * animation.scale * (1 - eased) + animation.toOffset[i] * animation.toScale * eased) / scale));
@@ -237,7 +248,7 @@ export const createPortConnectMenu = (scope) => ({
             const left = menuRect ? Math.max(area.left + 16, menuRect.right + 24) : area.left + 24;
             const right = area.right - 24;
             const top = Math.max(area.top, 0) + 24, bottom = area.bottom - 24;
-            const scale = Math.max(.1, Math.min(Math.max(1.25, focusView.scale), Math.max(40, right - left) / width));
+            const scale = Math.max(.1, Math.min(Math.max(getSetting("PortConnectMenu.PreviewZoom", 125) / 100, focusView.scale), Math.max(40, right - left) / width));
             let screenX, screenY;
             if (menuRect) {
                 screenX = left;
@@ -250,10 +261,17 @@ export const createPortConnectMenu = (scope) => ({
                 const anchoredTop = Math.min(top, Math.max(rect.top + 24, screenY));
                 screenY = Math.max(anchoredTop, Math.min(screenY, bottom - Math.min(height * scale, bottom - anchoredTop)));
             }
-            focus = { node, reason, anchor: { clientX: anchor.clientX, clientY: anchor.clientY }, settled: performance.now() + 250 };
-            animation = { started: performance.now(), scale: canvas.ds.scale, offset: [...canvas.ds.offset], toScale: scale,
-                toOffset: [(screenX - rect.left) / scale - x, (screenY - rect.top) / scale - y] };
+            const duration = getSetting("PortConnectMenu.AnimationDuration", 180);
+            const offset = [(screenX - rect.left) / scale - x, (screenY - rect.top) / scale - y];
+            focus = { node, reason, anchor: { clientX: anchor.clientX, clientY: anchor.clientY },
+                settled: performance.now() + Math.max(250, duration + 70) };
+            animation = duration > 0 ? { started: performance.now(), duration, scale: canvas.ds.scale,
+                offset: [...canvas.ds.offset], toScale: scale, toOffset: offset } : null;
+            if (!animation) applyView(scale, offset);
             startPaint();
+        };
+        const refocus = () => {
+            if (focus) { const previous = focus; focus = null; focusNode(previous.node, previous.anchor, previous.reason); }
         };
         const confirm = to => {
             if (!connection || !validPort(to) || !compatible(connection.from, to)) return false;
@@ -308,6 +326,17 @@ export const createPortConnectMenu = (scope) => ({
                 Object.assign(menu.style, { left: `${Math.max(8, area.left + 8, Math.min(anchor.clientX, area.right - rect.width - reserved - 8))}px`,
                     top: `${Math.max(8, area.top + 8, Math.min(anchor.clientY, area.bottom - rect.height - 8))}px` });
             };
+            updateMenuStyle = () => {
+                const fontSize = getSetting("PortConnectMenu.MenuFontSize", 12);
+                const maxWidth = getSetting("PortConnectMenu.MenuMaxWidth", 360);
+                menu.style.setProperty("--port-connect-font-size", `${fontSize}px`);
+                menu.style.setProperty("--port-connect-line-height", `${fontSize + 2}px`);
+                menu.style.setProperty("--port-connect-max-width", `${maxWidth}px`);
+                wireCtx.font = `${fontSize}px Arial, sans-serif`;
+                const width = candidates.reduce((width, node) => Math.max(width, wireCtx.measureText("0").width * idWidth + wireCtx.measureText(node.title).width + 42), 160);
+                naturalWidth = Math.ceil(Math.min(maxWidth, width));
+                positionMenu();
+            };
             const render = () => {
                 cancelHover(); restoreView(); list.replaceChildren();
                 const query = filter.value.trim().toLocaleLowerCase();
@@ -325,12 +354,7 @@ export const createPortConnectMenu = (scope) => ({
                     list.append(button);
                 }
                 message.textContent = matches.length ? "" : text("没有兼容或符合筛选条件的节点。", "No compatible nodes match this filter.");
-                if (!menu.style.width) {
-                    wireCtx.font = "12px Arial, sans-serif";
-                    const width = candidates.reduce((width, node) => Math.max(width, wireCtx.measureText("0").width * idWidth + wireCtx.measureText(node.title).width + 42), 160);
-                    naturalWidth = Math.ceil(Math.min(360, width));
-                }
-                positionMenu();
+                updateMenuStyle();
             };
             filter.addEventListener("input", render);
             filter.addEventListener("keydown", event => {
@@ -345,8 +369,8 @@ export const createPortConnectMenu = (scope) => ({
             cancelHover(); hoverNode = node; hoverPoint = { clientX: event.clientX, clientY: event.clientY };
             hoverTimer = setTimeout(() => {
                 const anchor = hoverPoint; cancelHover();
-                if (interactive() && node.graph === canvas.graph && (connection || lastPointer?.ctrlKey)) focusNode(node, anchor, reason);
-            }, 200);
+                if (interactive() && node.graph === canvas.graph && (connection || (sourceHoverZoom() && lastPointer?.ctrlKey))) focusNode(node, anchor, reason);
+            }, getSetting("PortConnectMenu.HoverDelay", 200));
         };
         const scheduleRestore = () => {
             if (leaveTimer !== null) return;
@@ -377,8 +401,8 @@ export const createPortConnectMenu = (scope) => ({
                 else if (focus.reason === "menu") { cancelHover(); return; }
                 else if (connection || !event.ctrlKey) scheduleRestore();
             }
-            const canTarget = node && connection && event.ctrlKey && !(event.buttons & ~1) && !event.shiftKey && !event.altKey && !event.metaKey;
-            const canSource = node && !connection && event.ctrlKey && !event.buttons && !event.shiftKey && !event.altKey && !event.metaKey
+            const canTarget = node && connection && targetHoverZoom() && event.ctrlKey && !(event.buttons & ~1) && !event.shiftKey && !event.altKey && !event.metaKey;
+            const canSource = node && !connection && sourceHoverZoom() && event.ctrlKey && !event.buttons && !event.shiftKey && !event.altKey && !event.metaKey
                 && !isEditing(element) && !canvas.linkConnector.isConnecting;
             if (interactive() && (canTarget || (!menu && canSource))) scheduleFocus(node, event, connection ? "direct" : "source");
             else cancelHover();
@@ -497,7 +521,7 @@ export const createPortConnectMenu = (scope) => ({
         }, { passive: true, capture: true });
         scope.listen(window, "resize", () => {
             positionMenu?.();
-            if (focus) { const previous = focus; focus = null; focusNode(previous.node, previous.anchor, previous.reason); }
+            refocus();
             paintWire();
         });
         scope.listen(canvas.canvas, "lostpointercapture", event => {
@@ -507,6 +531,19 @@ export const createPortConnectMenu = (scope) => ({
         for (const name of ["subgraph-opening", "litegraph:set-graph"]) scope.listen(canvas.canvas, name, reset);
         scope.listen(window, "blur", () => { reset(); lastPointer = null; spacePressed = spaceHandled = false; });
         scope.listen(app.ui.settings, "PortConnectMenu.Enabled.change", reset);
+        scope.listen(app.ui.settings, "PortConnectMenu.SourceHoverZoom.change", () => {
+            cancelHover();
+            if (!sourceHoverZoom() && focus?.reason === "source") restoreView();
+        });
+        scope.listen(app.ui.settings, "PortConnectMenu.TargetHoverZoom.change", () => {
+            if (!targetHoverZoom() && focus?.reason === "direct") restoreView();
+        });
+        scope.listen(app.ui.settings, "PortConnectMenu.HoverDelay.change", cancelHover);
+        for (const id of ["PreviewZoom", "AnimationDuration"]) scope.listen(app.ui.settings, `PortConnectMenu.${id}.change`, refocus);
+        for (const id of ["HighlightColor", "GlowStrength"]) scope.listen(app.ui.settings, `PortConnectMenu.${id}.change`, updateGlow);
+        for (const id of ["MenuMaxWidth", "MenuFontSize"]) scope.listen(app.ui.settings, `PortConnectMenu.${id}.change`, () => {
+            if (menu) { updateMenuStyle(); refocus(); }
+        });
         scope.add(() => { reset(); style.remove(); });
     }
 });
