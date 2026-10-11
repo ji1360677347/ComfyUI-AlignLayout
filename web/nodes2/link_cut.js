@@ -17,9 +17,15 @@ export const createLinkCut = (scope) => ({
         let pointer = null;
         let highlighted = false;
         const enabled = () => getSetting("LinkCut.Enabled", true);
+        const cutDistance = () => getSetting("LinkCut.CutDistance", 4);
+        const highlightDistance = () => Math.max(getSetting("LinkCut.HighlightDistance", 12), cutDistance() + 1);
+        const trail = document.createElement("canvas");
+        trail.className = "link-cut-trail";
+        Object.assign(trail.style, { position: "fixed", pointerEvents: "none", zIndex: "10000" });
+        const trailCtx = trail.getContext("2d");
 
         // 命中实际绘制路径，切断宽度默认为 8 个屏幕像素。
-        const findSegments = (points, screenWidth = 8) => {
+        const findSegments = (points, screenWidth = cutDistance() * 2) => {
             const graph = canvas.graph;
             const matches = [];
             const ctx = canvas.ctx;
@@ -62,7 +68,7 @@ export const createLinkCut = (scope) => ({
             }
             pointer = { clientX: event.clientX, clientY: event.clientY };
             // 未命中时不重绘；离开连线则立即清除高亮。
-            if (highlighted || findSegments([canvas.convertEventToCanvasOffset(pointer)], 24).length) {
+            if (highlighted || findSegments([canvas.convertEventToCanvasOffset(pointer)], highlightDistance() * 2).length) {
                 canvas.setDirty(true, false);
             } else {
                 clearHighlight();
@@ -77,13 +83,14 @@ export const createLinkCut = (scope) => ({
                 return;
             }
             const point = canvas.convertEventToCanvasOffset(pointer);
-            const segments = findSegments([point], 24);
+            const inner = cutDistance(), outer = highlightDistance();
+            const segments = findSegments([point], outer * 2);
             if (!segments.length) {
                 clearHighlight();
                 return;
             }
             highlighted = true;
-            // 距离按屏幕像素计算：12px 外无高亮，接近 4px 切断边界时最亮。
+            // 距离按屏幕像素计算，接近切断边界时最亮。
             // 对实际 Path2D 扩大描边并二分，曲线、折线和转接点使用相同规则。
             const strengths = [];
             ctx.save();
@@ -92,15 +99,15 @@ export const createLinkCut = (scope) => ({
                 ctx.setLineDash([]);
                 ctx.lineCap = ctx.lineJoin = "round";
                 for (const segment of segments) {
-                    let near = 4;
-                    let far = 12;
+                    let near = inner;
+                    let far = outer;
                     for (let i = 0; i < 6; i++) {
                         const distance = (near + far) / 2;
                         ctx.lineWidth = distance * 2 / canvas.ds.scale;
                         if (ctx.isPointInStroke(segment.path, ...point)) far = distance;
                         else near = distance;
                     }
-                    const progress = (12 - far) / 8;
+                    const progress = (outer - far) / (outer - inner);
                     strengths.push(progress * progress * (3 - 2 * progress));
                 }
             } finally {
@@ -141,6 +148,7 @@ export const createLinkCut = (scope) => ({
         const stopCutting = () => {
             if (!gesture?.cutting) return;
             gesture.cutting = false;
+            trail.remove();
             clearHighlight();
             if (gesture.changed) canvas.emitAfterChange();
         };
@@ -156,9 +164,18 @@ export const createLinkCut = (scope) => ({
             event.preventDefault();
             event.stopImmediatePropagation();
         };
-        const cutSegment = (end) => {
+        const cutSegment = (event) => {
+            const end = canvas.convertEventToCanvasOffset(event);
+            const next = [event.clientX - gesture.trailRect.left, event.clientY - gesture.trailRect.top];
+            if (trail.isConnected) {
+                trailCtx.beginPath();
+                trailCtx.moveTo(...gesture.trailPoint);
+                trailCtx.lineTo(...next);
+                trailCtx.stroke();
+            }
+            gesture.trailPoint = next;
             const { graph, point: start } = gesture;
-            const steps = Math.max(1, Math.ceil(Math.hypot(end[0] - start[0], end[1] - start[1]) * canvas.ds.scale / 3));
+            const steps = Math.max(1, Math.ceil(Math.hypot(end[0] - start[0], end[1] - start[1]) * canvas.ds.scale / Math.min(3, cutDistance())));
             const points = [];
             for (let i = 0; i <= steps; i++) {
                 points.push([start[0] + (end[0] - start[0]) * i / steps, start[1] + (end[1] - start[1]) * i / steps]);
@@ -201,8 +218,22 @@ export const createLinkCut = (scope) => ({
             consume(event);
             canvas.canvas.focus();
             app.extensionManager.workflow.activeWorkflow?.changeTracker.captureCanvasState();
+            const rect = canvas.canvas.getBoundingClientRect();
+            if (getSetting("LinkCut.TrailEnabled", true)) {
+                const ratio = window.devicePixelRatio || 1;
+                trail.width = Math.ceil(rect.width * ratio);
+                trail.height = Math.ceil(rect.height * ratio);
+                Object.assign(trail.style, { left: `${rect.left}px`, top: `${rect.top}px`, width: `${rect.width}px`, height: `${rect.height}px` });
+                trailCtx.setTransform(ratio, 0, 0, ratio, 0, 0);
+                const color = getSetting("LinkCut.TrailColor", "#FFFFFF");
+                trailCtx.strokeStyle = CSS.supports("color", color) ? color : "#FFFFFF";
+                trailCtx.lineWidth = getSetting("LinkCut.TrailWidth", 2);
+                trailCtx.lineCap = trailCtx.lineJoin = "round";
+                document.body.append(trail);
+            }
             gesture = {
                 graph: canvas.graph, point, cutting: true, changed: false,
+                trailRect: rect, trailPoint: [event.clientX - rect.left, event.clientY - rect.top],
                 element: canvas.canvas, pointerId: event.pointerId, cursor: canvas.canvas.style.cursor
             };
             suppressContextMenu = true;
@@ -225,9 +256,9 @@ export const createLinkCut = (scope) => ({
             if (!event.ctrlKey || !enabled()) stopCutting();
             if (gesture.cutting) {
                 for (const sample of event.getCoalescedEvents?.() || []) {
-                    cutSegment(canvas.convertEventToCanvasOffset(sample));
+                    cutSegment(sample);
                 }
-                cutSegment(canvas.convertEventToCanvasOffset(event));
+                cutSegment(event);
             }
             updatePointer(event);
         }, true);
@@ -238,7 +269,7 @@ export const createLinkCut = (scope) => ({
             }
             consume(event);
             if (gesture.cutting && event.ctrlKey && canvas.graph === gesture.graph) {
-                cutSegment(canvas.convertEventToCanvasOffset(event));
+                cutSegment(event);
             }
             finishGesture();
             updatePointer(event);
@@ -283,9 +314,15 @@ export const createLinkCut = (scope) => ({
             lastPointer = null;
             resetInteraction();
         });
+        scope.listen(window, "resize", resetInteraction);
         scope.listen(app.ui.settings, "LinkCut.Enabled.change", resetInteraction);
         for (const id of ["LinkCut.HighlightColor", "LinkCut.GlowStrength"]) {
             scope.listen(app.ui.settings, `${id}.change`, () => canvas.setDirty(true, false));
+        }
+        for (const id of ["LinkCut.CutDistance", "LinkCut.HighlightDistance"]) {
+            scope.listen(app.ui.settings, `${id}.change`, () => {
+                if (lastPointer) updatePointer({ ...lastPointer, ctrlKey: ctrlPressed });
+            });
         }
         scope.add(() => {
             resetInteraction();
