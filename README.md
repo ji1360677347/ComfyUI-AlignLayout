@@ -115,6 +115,23 @@ Nodes 2.0 按实际显示尺寸进行对齐、拉伸和自动布局，支持通�
 
 ---
 
+### 🔌 端口连接菜单 (Port Connection Menu)
+
+- **操作**：`Ctrl + 鼠标左键` 从节点输入/输出端口拖出，松开后选择当前画布的兼容端口。
+- **功能**：支持筛选、多端口选择、已有连接替换、取消保护和撤销，默认模式与 Nodes 2.0 均支持。
+- **详细说明文档：** [🔌 端口连接菜单](web/docs/port_connect_menu.md)
+
+---
+
+### ✂️ 划线断开 (Link Cut)
+
+- **功能**：按住 Ctrl，连线随指针接近渐亮并发光；远离或松开 Ctrl 后恢复原样。
+- **操作**：`Ctrl + 鼠标右键拖动` 划过连线即可断开，`Ctrl+Z` 撤销整次划动。
+- **设置**：独立开关、高亮颜色、发光强度，默认模式和 Nodes 2.0 均支持。
+- **详细说明文档：** [✂️ 划线断开 (Link Cut)](web/docs/link_cut.md)
+
+---
+
 ### 🔍 选择相同节点 (Select Same Nodes)
 
 - **功能**：一键选中画布上所有与当前选中节点类型一致的节点。
@@ -158,6 +175,10 @@ Nodes 2.0 按实际显示尺寸进行对齐、拉伸和自动布局，支持通�
 [🚀 收藏节点菜单 (Quick Node Menu)](web/docs/quick_node_menu.md)
 
 [🔗 快速连接 (Fast Link)](web/docs/fast_link.md)
+
+[✂️ 划线断开 (Link Cut)](web/docs/link_cut.md)
+
+[🔌 端口连接菜单](web/docs/port_connect_menu.md)
 
 [🔄 替换节点 (Replace Node)](web/docs/replace_node.md)
 

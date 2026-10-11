@@ -19,6 +19,22 @@
         "name": "模式重置超时 (ms)",
         "tooltip": "多次按键切换接口/节点功能的超时时间。超时后再次按键将视为新的操作。"
     },
+    "PortConnectMenu_Enabled": {
+        "name": "启用端口连接菜单",
+        "tooltip": "按住 Ctrl＋鼠标左键从端口拖出并松开，列出当前画布的兼容端口。点击后连接，取消时保留已有连线。"
+    },
+    "LinkCut_Enabled": {
+        "name": "启用划线断开",
+        "tooltip": "独立于快速连线。按住 Ctrl，连线随指针接近渐亮；Ctrl＋右键拖动划过后断开。Ctrl+Z 撤销整次划动。"
+    },
+    "LinkCut_HighlightColor": {
+        "name": "高亮颜色",
+        "tooltip": "按住 Ctrl 时连线的高亮和发光颜色，例如 #66CCFF。"
+    },
+    "LinkCut_GlowStrength": {
+        "name": "发光强度",
+        "tooltip": "按住 Ctrl 时连线外发光的模糊半径，范围 0～50。设为 0 时仅显示颜色高亮。"
+    },
     "FastLink_MatchStrategy": {
         "name": "端口匹配优先级",
         "tooltip": "两种模式均使用 ComfyUI 的类型兼容规则。“名称优先”会优先连接同名端口，名称不同也可连接；“仅类型兼容”忽略端口名称。",
