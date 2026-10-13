@@ -21,7 +21,7 @@
     },
     "PortConnectMenu_Enabled": {
         "name": "启用连接助手",
-        "tooltip": "Ctrl 悬停起始节点，临时放大主视图，松开 Ctrl 恢复；Ctrl 从端口拖到目标节点，放大后在真实端口连接，移出目标恢复。悬停菜单选项时定位目标到固定菜单右边。连接完成或 Esc 取消后恢复原视图。"
+        "tooltip": "左键从端口拖线时，保持左键按住，按一下 Ctrl 锁定连线；Ctrl 悬停放大节点后拉线自动锁定。松开左键仍保持待连接，单击画布空白处打开节点菜单，悬停选项定位目标到菜单右边。在兼容端口上松开或单击确认；Esc 或右键取消并恢复原视图。"
     },
     "PortConnectMenu_SourceHoverZoom": {
         "name": "接线前悬停放大",
@@ -37,15 +37,15 @@
     },
     "PortConnectMenu_AnimationDuration": {
         "name": "定位动画时长（毫秒）",
-        "tooltip": "定位时平移和缩放的动画时长，默认 180 毫秒；设为 0 时立即定位。"
+        "tooltip": "放大定位，以及连接成功或右键、Esc 取消后返回原视图的平移、缩放动画时长，默认 180 毫秒；设为 0 时立即定位或返回。"
     },
     "PortConnectMenu_HighlightColor": {
         "name": "节点高亮颜色",
-        "tooltip": "当前查看节点的边框和发光颜色，例如 #66CCFF。"
+        "tooltip": "当前查看节点、兼容端口和参数输入的高亮及发光颜色，例如 #66CCFF。"
     },
     "PortConnectMenu_GlowStrength": {
         "name": "节点发光强度",
-        "tooltip": "当前查看节点的外发光模糊半径，范围 0～50；设为 0 时只保留高亮边框。"
+        "tooltip": "当前查看节点及兼容端口的外发光模糊半径，范围 0～50；设为 0 时只保留高亮描边。"
     },
     "PortConnectMenu_HoverDelay": {
         "name": "悬停等待时间（毫秒）",

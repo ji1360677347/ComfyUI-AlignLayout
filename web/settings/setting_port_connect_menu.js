@@ -37,7 +37,7 @@ app.registerExtension({
             defaultValue: 8,
             attrs: { min: 0, max: 50, step: 1 },
             category: ["AlignLayout", "Connection Assistant", "Glow Strength"],
-            tooltip: "Glow blur radius around the node being viewed. Set to 0 to keep only its highlighted border."
+            tooltip: "Glow blur radius around the node being viewed and compatible target ports. Set to 0 to keep only the highlight outlines."
         },
         {
             id: "PortConnectMenu.HighlightColor",
@@ -45,7 +45,7 @@ app.registerExtension({
             type: "text",
             defaultValue: "#66CCFF",
             category: ["AlignLayout", "Connection Assistant", "Highlight Color"],
-            tooltip: "Border and glow color of the node being viewed, for example #66CCFF."
+            tooltip: "Highlight and glow color of the node being viewed, compatible ports and parameter inputs, for example #66CCFF."
         },
         {
             id: "PortConnectMenu.AnimationDuration",
@@ -54,7 +54,7 @@ app.registerExtension({
             defaultValue: 180,
             attrs: { min: 0, max: 1000, step: 10 },
             category: ["AlignLayout", "Connection Assistant", "Animation Duration"],
-            tooltip: "Duration of the view's pan and zoom animation. Set to 0 to position the view immediately."
+            tooltip: "Duration of pan and zoom when focusing a node and returning to the original view after connecting or cancelling. Set to 0 to position the view immediately."
         },
         {
             id: "PortConnectMenu.PreviewZoom",
@@ -87,7 +87,7 @@ app.registerExtension({
             type: "boolean",
             defaultValue: true,
             category: ["AlignLayout", "Connection Assistant", "Enable Feature"],
-            tooltip: "Ctrl + drag from a port to start a pending connection. Hover a menu item to view the real target to its right; release or click a compatible port to connect. Esc cancels and restores the original view."
+            tooltip: "Drag from a port with the left button, then press Ctrl while still holding it to lock the connection. Dragging from a Ctrl-hover zoomed node locks automatically. Release keeps the wire pending; click blank canvas to open the node menu. Release or click a compatible port to connect; Esc or right-click cancels."
         }
     ]
 });
